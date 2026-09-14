@@ -111,20 +111,21 @@ export class PlayerService {
         if (!currentTrack || currentTrack.sourceUri !== sdkUri) {
           const artistName = t.artists?.map((a: any) => a.name).join(', ') ?? '';
           const imageUrl = t.album?.images?.[0]?.url ?? '';
-          this.currentTrackSubject.next({
-            id: t.id ?? '',
-            title: t.name ?? '',
-            artist: artistName,
-            album: t.album?.name ?? '',
-            thumbnailUrl: imageUrl,
-            durationMs: dur,
-            source: 'spotify',
-            sourceUri: sdkUri,
-            previewUrl: ''
-          });
+            this.currentTrackSubject.next({
+              id: t.id ?? '',
+              title: t.name ?? '',
+              artist: artistName,
+              album: t.album?.name ?? '',
+              thumbnailUrl: imageUrl,
+              durationMs: dur,
+              source: 'spotify',
+              sourceUri: sdkUri,
+              previewUrl: ''
+            });
+            this.updateMediaSession(this.currentTrackSubject.value!);
+          }
         }
-      }
-    });
+      });
 
     this.spotifySdkPlayer.addListener('authentication_error', (e: any) =>
       console.error('Spotify auth error:', e)
@@ -311,6 +312,8 @@ export class PlayerService {
     // Persist to recently played history
     this.recentlyPlayed.addTrack(track);
 
+    this.updateMediaSession(track);
+
     if (track.source === 'spotify') {
       this.stopYouTube();
       this.stopPreviewAudio();
@@ -449,6 +452,35 @@ export class PlayerService {
   get isSpotifyReady(): boolean { return this.spotifyReadySubject.value; }
 
   // ─── Private Helpers ───────────────────────────────────────────────────────
+
+  private updateMediaSession(track: UnifiedTrack) {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title,
+        artist: track.artist,
+        album: track.album || 'Wavify',
+        artwork: [
+          { src: track.thumbnailUrl, sizes: '96x96', type: 'image/png' },
+          { src: track.thumbnailUrl, sizes: '128x128', type: 'image/png' },
+          { src: track.thumbnailUrl, sizes: '192x192', type: 'image/png' },
+          { src: track.thumbnailUrl, sizes: '256x256', type: 'image/png' },
+          { src: track.thumbnailUrl, sizes: '384x384', type: 'image/png' },
+          { src: track.thumbnailUrl, sizes: '512x512', type: 'image/png' }
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', () => { this.togglePlayPause(); });
+      navigator.mediaSession.setActionHandler('pause', () => { this.togglePlayPause(); });
+      navigator.mediaSession.setActionHandler('previoustrack', () => { this.playPrevious(); });
+      navigator.mediaSession.setActionHandler('nexttrack', () => { this.playNext(); });
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime !== undefined && track.durationMs) {
+          const percent = (details.seekTime / (track.durationMs / 1000)) * 100;
+          this.seekTo(percent);
+        }
+      });
+    }
+  }
 
   private playYouTube(videoId: string) {
     if (this.youtubePlayer && this.youtubePlayer.loadVideoById) {
