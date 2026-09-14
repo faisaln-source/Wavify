@@ -32,3 +32,11 @@ export interface SpotifyPlaylist {
   trackCount: number;
   owner: string;
 }
+
+/** User-created local playlist stored in localStorage */
+export interface LocalPlaylist {
+  id: string;
+  name: string;
+  createdAt: number;
+  tracks: UnifiedTrack[];
+}

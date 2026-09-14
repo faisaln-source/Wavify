@@ -11,7 +11,7 @@ public class ChatService
 {
     private readonly HttpClient _http;
     private const string ApiUrl = "https://api.groq.com/openai/v1/chat/completions";
-    private const string Model = "groq/compound";
+    private const string Model = "llama3-8b-8192";
 
     public ChatService(HttpClient http, IConfiguration config)
     {

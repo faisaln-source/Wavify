@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { UnifiedTrack } from '../models/track.model';
 import { SpotifyAuthService } from './spotify-auth.service';
+import { RecentlyPlayedService } from './recently-played.service';
 
 @Injectable({ providedIn: 'root' })
 export class PlayerService {
@@ -35,7 +36,10 @@ export class PlayerService {
   private progressInterval: any = null;
   private isContextPlaying = false; // true when playing via context_uri (playlist/album)
 
-  constructor(private spotifyAuth: SpotifyAuthService) {
+  constructor(
+    private spotifyAuth: SpotifyAuthService,
+    private recentlyPlayed: RecentlyPlayedService
+  ) {
     this.audioElement = new Audio();
     this.audioElement.addEventListener('ended', () => this.playNext());
     this.audioElement.addEventListener('timeupdate', () => {
@@ -303,6 +307,9 @@ export class PlayerService {
     if (playlist) this.queueSubject.next(playlist);
     this.currentTrackSubject.next(track);
     this.progressSubject.next(0);
+
+    // Persist to recently played history
+    this.recentlyPlayed.addTrack(track);
 
     if (track.source === 'spotify') {
       this.stopYouTube();

@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PlayerService } from '../../core/services/player.service';
+import { FavoritesService } from '../../core/services/favorites.service';
 
 @Component({
   selector: 'app-player-bar',
@@ -72,6 +73,16 @@ import { PlayerService } from '../../core/services/player.service';
         <div class="mini-eq" *ngIf="(playerService.isPlaying$ | async)">
           <span></span><span></span><span></span><span></span><span></span>
         </div>
+        <!-- Favourite toggle for current track -->
+        <button class="heart-btn" *ngIf="(playerService.currentTrack$ | async) as t"
+                [class.liked]="favorites.isFavorite(t)"
+                (click)="toggleFavorite(t)"
+                [title]="favorites.isFavorite(t) ? 'Remove from favourites' : 'Add to favourites'"
+                id="btn-heart">
+          <svg viewBox="0 0 24 24" [attr.fill]="favorites.isFavorite(t) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+            <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+          </svg>
+        </button>
         <div class="volume-section">
           <button class="ctrl-btn" (click)="toggleMute()" id="btn-volume">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" *ngIf="(playerService.volume$ | async)! > 50"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
@@ -460,6 +471,19 @@ import { PlayerService } from '../../core/services/player.service';
       z-index: 1;
     }
 
+    /* Heart / favourite button in player bar */
+    .heart-btn {
+      width: 30px; height: 30px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; cursor: pointer;
+      color: var(--text-tertiary); transition: all 0.2s ease; flex-shrink: 0;
+    }
+    .heart-btn svg { width: 17px; height: 17px; transition: all 0.2s; }
+    .heart-btn:hover { color: #f472b6; transform: scale(1.15); }
+    .heart-btn.liked { color: #f472b6; }
+    .heart-btn.liked:hover { color: #e11d48; }
+    .heart-btn.liked svg { filter: drop-shadow(0 0 4px rgba(244,114,182,0.5)); }
+
     .mini-eq {
       display: flex;
       align-items: flex-end;
@@ -567,7 +591,14 @@ import { PlayerService } from '../../core/services/player.service';
 export class PlayerBarComponent {
   private previousVolume = 80;
 
-  constructor(public playerService: PlayerService) {}
+  constructor(
+    public playerService: PlayerService,
+    public favorites: FavoritesService
+  ) {}
+
+  toggleFavorite(track: any) {
+    this.favorites.toggle(track);
+  }
 
   onProgressClick(event: MouseEvent) {
     const bar = event.currentTarget as HTMLElement;
