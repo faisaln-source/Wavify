@@ -589,7 +589,7 @@ import { FavoritesService } from '../../core/services/favorites.service';
   `]
 })
 export class PlayerBarComponent {
-  private previousVolume = 80;
+  private previousVolume = 50;
 
   constructor(
     public playerService: PlayerService,

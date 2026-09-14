@@ -10,7 +10,7 @@ export class PlayerService {
   private isPlayingSubject = new BehaviorSubject<boolean>(false);
   private queueSubject = new BehaviorSubject<UnifiedTrack[]>([]);
   private progressSubject = new BehaviorSubject<number>(0);
-  private volumeSubject = new BehaviorSubject<number>(80);
+  private volumeSubject = new BehaviorSubject<number>(50);
   private shuffleSubject = new BehaviorSubject<boolean>(false);
   private repeatSubject = new BehaviorSubject<'off' | 'all' | 'one'>('off');
   private spotifyReadySubject = new BehaviorSubject<boolean>(false);
