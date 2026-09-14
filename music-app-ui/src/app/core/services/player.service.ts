@@ -10,7 +10,7 @@ export class PlayerService {
   private isPlayingSubject = new BehaviorSubject<boolean>(false);
   private queueSubject = new BehaviorSubject<UnifiedTrack[]>([]);
   private progressSubject = new BehaviorSubject<number>(0);
-  private volumeSubject = new BehaviorSubject<number>(50);
+  private volumeSubject = new BehaviorSubject<number>(parseInt(localStorage.getItem('wavify_volume') || '50', 10));
   private shuffleSubject = new BehaviorSubject<boolean>(false);
   private repeatSubject = new BehaviorSubject<'off' | 'all' | 'one'>('off');
   private spotifyReadySubject = new BehaviorSubject<boolean>(false);
@@ -412,6 +412,7 @@ export class PlayerService {
   }
 
   setVolume(vol: number) {
+    localStorage.setItem('wavify_volume', vol.toString());
     this.volumeSubject.next(vol);
     if (this.audioElement) this.audioElement.volume = vol / 100;
     if (this.youtubePlayer) this.youtubePlayer.setVolume(vol);

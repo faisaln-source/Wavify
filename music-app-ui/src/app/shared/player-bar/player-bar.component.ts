@@ -589,7 +589,7 @@ import { FavoritesService } from '../../core/services/favorites.service';
   `]
 })
 export class PlayerBarComponent {
-  private previousVolume = 50;
+  private previousVolume = parseInt(localStorage.getItem('wavify_volume') || '50', 10);
 
   constructor(
     public playerService: PlayerService,
