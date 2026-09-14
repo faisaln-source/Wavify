@@ -41,7 +41,7 @@ import { LocalPlaylist } from '../../core/models/track.model';
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
         </button>
-        <div class="playlist-dropdown" *ngIf="dropdownOpen">
+        <div class="playlist-dropdown" [class.drop-up]="dropUp" *ngIf="dropdownOpen">
           <div class="dropdown-header">Add to playlist</div>
           <div class="dropdown-empty" *ngIf="(playlists.playlists$ | async)?.length === 0">
             <span>No playlists yet.</span>
@@ -131,9 +131,17 @@ import { LocalPlaylist } from '../../core/models/track.model';
       background: var(--bg-secondary); border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md); padding: 6px; min-width: 200px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      transform-origin: top right;
       animation: dropIn 0.15s ease forwards;
     }
+    .playlist-dropdown.drop-up {
+      top: auto;
+      bottom: calc(100% + 6px);
+      transform-origin: bottom right;
+      animation: dropUpIn 0.15s ease forwards;
+    }
     @keyframes dropIn { from { opacity: 0; transform: translateY(-6px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes dropUpIn { from { opacity: 0; transform: translateY(6px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
     .dropdown-header {
       font-size: 10px; font-weight: 700; text-transform: uppercase;
@@ -195,6 +203,7 @@ export class TrackCardComponent {
   }
 
   dropdownOpen = false;
+  dropUp = false;
 
   constructor(
     public playerService: PlayerService,
@@ -220,9 +229,13 @@ export class TrackCardComponent {
     return isCurrent;
   }
 
-  toggleDropdown(event: Event) {
+  toggleDropdown(event: MouseEvent) {
     event.stopPropagation();
     this.dropdownOpen = !this.dropdownOpen;
+    if (this.dropdownOpen) {
+      // Open upwards if clicked in the bottom 40% of the screen to prevent cutoff
+      this.dropUp = event.clientY > (window.innerHeight * 0.6);
+    }
   }
 
   toggleInPlaylist(pl: LocalPlaylist) {
