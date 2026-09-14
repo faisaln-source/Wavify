@@ -1,4 +1,4 @@
-﻿import { Component, Input, HostListener, ElementRef } from '@angular/core';
+import { Component, Input, HostListener, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { UnifiedTrack } from '../../core/models/track.model';
 import { PlayerService } from '../../core/services/player.service';
@@ -29,7 +29,7 @@ import { LocalPlaylist } from '../../core/models/track.model';
         <span class="track-artist">{{ track.artist }}</span>
       </div>
       <span class="badge" [class.badge-spotify]="track.source === 'spotify'" [class.badge-youtube]="track.source === 'youtube'">
-        {{ track.source === 'spotify' ? 'â™«' : 'â–¶' }} {{ track.source }}
+        {{ track.source === 'spotify' ? '♫' : '▶' }} {{ track.source }}
       </span>
 
       <!-- Add to Playlist button + dropdown -->
