@@ -1,4 +1,4 @@
-import { Component, Input, HostListener, ElementRef } from '@angular/core';
+import { Component, Input, HostListener, HostBinding, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { UnifiedTrack } from '../../core/models/track.model';
 import { PlayerService } from '../../core/services/player.service';
@@ -187,6 +187,12 @@ export class TrackCardComponent {
   @Input() track!: UnifiedTrack;
   @Input() index?: number;
   @Input() playlist?: UnifiedTrack[];
+
+  @HostBinding('style.display') display = 'block';
+  @HostBinding('style.position') position = 'relative';
+  @HostBinding('style.zIndex') get zIndex() {
+    return this.dropdownOpen ? 1000 : 1;
+  }
 
   dropdownOpen = false;
 
