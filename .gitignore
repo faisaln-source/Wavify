@@ -1,0 +1,19 @@
+﻿# Secrets - never commit these
+MusicApp.Api/appsettings.Local.json
+
+# .NET build output
+MusicApp.Api/bin/
+MusicApp.Api/obj/
+
+# Angular
+music-app-ui/node_modules/
+music-app-ui/dist/
+music-app-ui/.angular/
+
+# PM2
+ecosystem.config.js
+start-ui.js
+
+# OS
+.DS_Store
+Thumbs.db

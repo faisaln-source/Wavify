@@ -1,0 +1,22 @@
+﻿services:
+  - type: web
+    name: wavify-api
+    runtime: docker
+    dockerfilePath: ./MusicApp.Api/Dockerfile
+    dockerContext: ./MusicApp.Api
+    plan: free
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: Groq__ApiKey
+        sync: false
+      - key: Spotify__ClientId
+        sync: false
+      - key: Spotify__ClientSecret
+        sync: false
+      - key: Spotify__RedirectUri
+        sync: false
+      - key: YouTube__ApiKey
+        sync: false
+      - key: AllowedOrigins
+        sync: false

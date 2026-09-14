@@ -1,0 +1,593 @@
+import { Component, OnInit, OnDestroy, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { TrackCardComponent } from '../../shared/track-card/track-card.component';
+import { ApiService } from '../../core/services/api.service';
+import { PlayerService } from '../../core/services/player.service';
+import { SpotifyAuthService } from '../../core/services/spotify-auth.service';
+import { UnifiedTrack } from '../../core/models/track.model';
+
+interface MoodChip {
+  label: string;
+  emoji: string;
+  query: string;
+  gradient: string;
+}
+
+@Component({
+  selector: 'app-home',
+  standalone: true,
+  imports: [CommonModule, TrackCardComponent],
+  template: `
+    <div class="home-page">
+      <header class="page-header">
+        <div class="greeting">
+          <h1 class="gradient-text">{{ greeting() }}</h1>
+          <p>Discover music from Spotify and YouTube in one place.</p>
+        </div>
+      </header>
+
+      <!-- Mood/Genre Chips -->
+      <section class="mood-section">
+        <h2 class="section-title">🎵 Browse by Mood</h2>
+        <div class="mood-chips">
+          <button
+            *ngFor="let mood of moods"
+            class="mood-chip"
+            [class.active]="activeMood?.label === mood.label"
+            [style.--chip-gradient]="mood.gradient"
+            (click)="selectMood(mood)"
+            [id]="'btn-mood-' + mood.label.toLowerCase()">
+            <span class="mood-emoji">{{ mood.emoji }}</span>
+            <span class="mood-label">{{ mood.label }}</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Mood Results -->
+      <section class="mood-results" *ngIf="activeMood">
+        <div class="section-header">
+          <h2 class="section-title">
+            {{ activeMood.emoji }} {{ activeMood.label }}
+            <span class="badge badge-spotify" *ngIf="moodSource !== 'youtube'">Spotify</span>
+            <span class="badge badge-youtube" *ngIf="moodSource !== 'spotify'">YouTube</span>
+          </h2>
+          <div class="source-toggle">
+            <button class="src-btn" [class.active]="moodSource==='all'"     (click)="setMoodSource('all')">All</button>
+            <button class="src-btn spotify" [class.active]="moodSource==='spotify'"  (click)="setMoodSource('spotify')">♫ Spotify</button>
+            <button class="src-btn youtube" [class.active]="moodSource==='youtube'"  (click)="setMoodSource('youtube')">▶ YouTube</button>
+            <button class="clear-mood-btn" (click)="clearMood()">✕</button>
+          </div>
+        </div>
+        <div class="loading-inline" *ngIf="loadingMood">
+          <div class="spinner-sm"></div>
+          <span>Finding {{ activeMood.label.toLowerCase() }} tracks…</span>
+        </div>
+        <div class="panel-tracks" *ngIf="!loadingMood && filteredMoodTracks.length > 0">
+          <app-track-card
+            *ngFor="let track of filteredMoodTracks; let i = index"
+            [track]="track" [index]="i" [playlist]="filteredMoodTracks">
+          </app-track-card>
+        </div>
+        <div class="empty-state" *ngIf="!loadingMood && filteredMoodTracks.length === 0">
+          <p>No tracks found for this mood &amp; source.</p>
+        </div>
+      </section>
+
+      <!-- Hero Cards (shown when no mood is active) -->
+      <section class="hero-section animate-slide-up" *ngIf="!activeMood"
+               [class.hero-single]="!spotifyReleases.length">
+        <div class="hero-card glass" *ngIf="spotifyReleases.length > 0" (click)="playAll(spotifyReleases)">
+          <div class="hero-bg spotify-bg"></div>
+          <div class="hero-content">
+            <span class="badge badge-spotify">♫ Spotify</span>
+            <h2>Your Music</h2>
+            <p>Your top &amp; liked tracks on Spotify</p>
+            <button class="hero-play-btn" id="btn-play-releases">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Play All
+            </button>
+          </div>
+        </div>
+        <div class="hero-card glass" *ngIf="youtubeTrending.length > 0" (click)="playAll(youtubeTrending)">
+          <div class="hero-bg youtube-bg"></div>
+          <div class="hero-content">
+            <span class="badge badge-youtube">▶ YouTube</span>
+            <h2>Trending Music</h2>
+            <p>Most popular music videos right now</p>
+            <button class="hero-play-btn" id="btn-play-trending">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Play All
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Spotify CTA banner (shown inline, not as a grid column) -->
+      <div class="spotify-cta-banner" *ngIf="!activeMood && !loading && !spotifyReleases.length && !spotifyAuth.isLoggedIn()">
+        <div class="cta-icon">♫</div>
+        <div class="cta-text">
+          <strong>Connect Spotify</strong>
+          <span>Sign in to see your personalized music alongside YouTube trending</span>
+        </div>
+        <button class="connect-btn" id="btn-connect-spotify" (click)="connectSpotify()">Connect Spotify</button>
+      </div>
+
+      <!-- Retry banner when logged in but failed -->
+      <div class="spotify-cta-banner warn" *ngIf="!activeMood && !loading && !spotifyReleases.length && spotifyAuth.isLoggedIn()">
+        <div class="cta-icon" style="color:#f87171">⚠</div>
+        <div class="cta-text">
+          <strong>Couldn't load Spotify tracks</strong>
+          <span>The Spotify API returned an error.</span>
+        </div>
+        <button class="connect-btn retry-btn" id="btn-retry-spotify" (click)="retrySpotify()">Retry</button>
+      </div>
+
+      <!-- Two-Column Track Lists (shown when no mood is active) -->
+      <section class="dual-panel" *ngIf="!activeMood"
+               [class.single-panel]="!spotifyReleases.length">
+        <!-- Spotify Column -->
+        <div class="panel" *ngIf="spotifyReleases.length">
+          <div class="panel-header">
+            <h2>Your Music <span class="badge badge-spotify">Spotify</span></h2>
+            <button class="show-more-btn" *ngIf="spotifyReleases.length > 10"
+                    (click)="showAllSpotify = !showAllSpotify">
+              {{ showAllSpotify ? 'Show Less' : 'Show All (' + spotifyReleases.length + ')' }}
+            </button>
+          </div>
+          <div class="panel-tracks">
+            <app-track-card
+              *ngFor="let track of (showAllSpotify ? spotifyReleases : spotifyReleases.slice(0, 20)); let i = index"
+              [track]="track" [index]="i" [playlist]="spotifyReleases">
+            </app-track-card>
+          </div>
+        </div>
+
+        <!-- YouTube Column -->
+        <div class="panel" *ngIf="youtubeTrending.length">
+          <div class="panel-header">
+            <h2>Trending Music <span class="badge badge-youtube">YouTube</span></h2>
+            <button class="show-more-btn" *ngIf="youtubeTrending.length > 10"
+                    (click)="showAllYouTube = !showAllYouTube">
+              {{ showAllYouTube ? 'Show Less' : 'Show All (' + youtubeTrending.length + ')' }}
+            </button>
+          </div>
+          <div class="panel-tracks">
+            <app-track-card
+              *ngFor="let track of (showAllYouTube ? youtubeTrending : youtubeTrending.slice(0, 20)); let i = index"
+              [track]="track" [index]="i" [playlist]="youtubeTrending">
+            </app-track-card>
+          </div>
+        </div>
+      </section>
+
+      <div class="loading" *ngIf="loading">
+        <div class="spinner"></div>
+        <span>Loading your music...</span>
+      </div>
+    </div>
+  `,
+  styles: [`
+    .home-page {
+      padding: 24px 28px;
+      padding-bottom: 120px;
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    .page-header { margin-bottom: 20px; }
+
+    .greeting h1 {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 4px;
+    }
+    .greeting p { color: var(--text-secondary); font-size: 14px; }
+
+    /* ── Mood Section ── */
+    .mood-section { margin-bottom: 24px; }
+
+    .section-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      letter-spacing: -0.3px;
+    }
+
+    .mood-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .mood-chip {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 18px;
+      border-radius: 100px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mood-chip::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--chip-gradient, linear-gradient(135deg,#8b5cf6,#7c3aed));
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .mood-chip:hover::before, .mood-chip.active::before { opacity: 0.12; }
+
+    .mood-chip.active {
+      border-color: transparent;
+      color: var(--text-primary);
+      box-shadow: 0 0 0 2px rgba(139,92,246,0.4);
+    }
+
+    .mood-chip:hover {
+      transform: translateY(-2px);
+      border-color: rgba(139,92,246,0.3);
+      color: var(--text-primary);
+    }
+
+    .mood-emoji { font-size: 18px; position: relative; }
+    .mood-label { position: relative; }
+
+    /* ── Mood Results ── */
+    .mood-results { margin-bottom: 28px; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .clear-mood-btn {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      padding: 4px 12px;
+      border-radius: 100px;
+      border: 1px solid var(--border-subtle);
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .clear-mood-btn:hover { color: var(--text-secondary); background: var(--bg-card); }
+
+    .loading-inline {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 20px 0;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .spinner-sm {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(167,139,250,0.2);
+      border-top-color: var(--accent-primary);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    /* Source Toggle */
+    .source-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .src-btn {
+      font-size: 11px; font-weight: 600;
+      padding: 4px 13px; border-radius: 100px;
+      border: 1px solid var(--border-subtle);
+      background: transparent; color: var(--text-secondary);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .src-btn:hover { color: var(--text-primary); border-color: rgba(167,139,250,0.4); }
+    .src-btn.active { color: white; border-color: transparent; background: rgba(167,139,250,0.25); }
+    .src-btn.spotify.active { background: rgba(29,185,84,0.25); color: #1db954; border-color: rgba(29,185,84,0.4); }
+    .src-btn.youtube.active { background: rgba(255,0,0,0.2); color: #ff4444; border-color: rgba(255,68,68,0.4); }
+
+    /* Hero Cards */
+    .hero-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .hero-section.hero-single {
+      grid-template-columns: 1fr;
+    }
+
+    .hero-card {
+      position: relative;
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all var(--transition-base);
+      min-height: 140px;
+      display: flex;
+      align-items: flex-end;
+    }
+    .hero-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      opacity: 0.15;
+    }
+    .spotify-bg { background: linear-gradient(135deg, #1db954 0%, #1ed760 100%); }
+    .youtube-bg { background: linear-gradient(135deg, #ff0000 0%, #ff4444 100%); }
+
+    .hero-content { position: relative; z-index: 1; }
+    .hero-content h2 { font-size: 20px; font-weight: 700; margin: 8px 0 4px; }
+    .hero-content p { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
+
+    .hero-play-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 20px; background: var(--accent-gradient);
+      border-radius: 100px; font-size: 12px; font-weight: 600;
+      color: white; transition: all var(--transition-fast);
+      box-shadow: 0 2px 12px rgba(167,139,250,0.3);
+    }
+    .hero-play-btn:hover { transform: scale(1.05); box-shadow: 0 4px 20px rgba(167,139,250,0.5); }
+    .hero-play-btn svg { width: 14px; height: 14px; }
+
+    /* ── Spotify CTA Banner ── */
+    .spotify-cta-banner {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 20px;
+      margin-bottom: 20px;
+      background: rgba(29,185,84,0.08);
+      border: 1px solid rgba(29,185,84,0.2);
+      border-radius: var(--radius-lg);
+      animation: fadeIn 0.4s ease;
+    }
+    .spotify-cta-banner.warn {
+      background: rgba(248,113,113,0.07);
+      border-color: rgba(248,113,113,0.2);
+    }
+    .cta-icon { font-size: 28px; flex-shrink: 0; color: #1db954; }
+    .spotify-cta-banner.warn .cta-icon { color: #f87171; }
+    .cta-text { flex: 1; min-width: 0; }
+    .cta-text strong { display: block; font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; }
+    .cta-text span { font-size: 12px; color: var(--text-secondary); }
+    .connect-btn {
+      flex-shrink: 0;
+      padding: 9px 22px;
+      background: #1db954;
+      color: white;
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      white-space: nowrap;
+    }
+    .connect-btn:hover { background: #1ed760; transform: scale(1.04); }
+    .retry-btn { background: #7c3aed; }
+    .retry-btn:hover { background: #6d28d9; }
+
+    /* Two-Column Panel */
+    .dual-panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .dual-panel.single-panel {
+      grid-template-columns: 1fr;
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 18px 8px;
+    }
+    .panel-header h2 { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+
+    .show-more-btn {
+      font-size: 11px; font-weight: 600; color: var(--accent-primary);
+      padding: 4px 12px; border-radius: 100px;
+      border: 1px solid rgba(167,139,250,0.2);
+      background: rgba(167,139,250,0.06); transition: all var(--transition-fast); cursor: pointer;
+    }
+    .show-more-btn:hover { background: rgba(167,139,250,0.15); border-color: rgba(167,139,250,0.4); }
+
+    .panel-tracks { padding: 4px 6px 10px; }
+
+    .empty-state { padding: 40px; text-align: center; color: var(--text-tertiary); font-size: 14px; }
+
+    .loading {
+      display: flex; align-items: center; justify-content: center;
+      gap: 12px; padding: 40px; color: var(--text-tertiary);
+    }
+    .spinner {
+      width: 24px; height: 24px; border: 2px solid var(--border-medium);
+      border-top-color: var(--accent-primary); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      .home-page { padding: 14px 14px; padding-bottom: 16px; }
+
+      .hero-section { grid-template-columns: 1fr; gap: 10px; margin-bottom: 18px; }
+      .hero-card { min-height: 110px; }
+
+      .mood-chips { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+      .mood-chips::-webkit-scrollbar { display: none; }
+
+      .dual-panel, .dual-panel.single-panel { grid-template-columns: 1fr; gap: 16px; }
+
+      .spotify-cta-banner { flex-wrap: wrap; }
+
+      .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .source-toggle { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    }
+  `]
+})
+export class HomeComponent implements OnInit, OnDestroy {
+  spotifyReleases: UnifiedTrack[] = [];
+  youtubeTrending: UnifiedTrack[] = [];
+  loading = true;
+  showAllSpotify = false;
+  showAllYouTube = false;
+
+  greeting = signal(this.computeGreeting());
+  private greetingTimer: any;
+
+  // Mood state
+  activeMood: MoodChip | null = null;
+  moodTracks: UnifiedTrack[] = [];  // all tracks (spotify + youtube)
+  moodSource: 'all' | 'spotify' | 'youtube' = 'all';
+  loadingMood = false;
+
+  get filteredMoodTracks(): UnifiedTrack[] {
+    if (this.moodSource === 'all') return this.moodTracks;
+    return this.moodTracks.filter(t => t.source === this.moodSource);
+  }
+
+  moods: MoodChip[] = [
+    { label: 'Happy',   emoji: '😊', query: 'happy upbeat pop',        gradient: 'linear-gradient(135deg,#f59e0b,#fbbf24)' },
+    { label: 'Chill',   emoji: '😌', query: 'chill lofi relaxing',     gradient: 'linear-gradient(135deg,#06b6d4,#0ea5e9)' },
+    { label: 'Focus',   emoji: '🧠', query: 'focus instrumental study', gradient: 'linear-gradient(135deg,#8b5cf6,#7c3aed)' },
+    { label: 'Party',   emoji: '🎉', query: 'party dance EDM hits',     gradient: 'linear-gradient(135deg,#ec4899,#be185d)' },
+    { label: 'Romance', emoji: '❤️',  query: 'romantic love songs',      gradient: 'linear-gradient(135deg,#ef4444,#dc2626)' },
+    { label: 'Sad',     emoji: '😢', query: 'sad emotional ballad',     gradient: 'linear-gradient(135deg,#6366f1,#4338ca)' },
+    { label: 'Workout', emoji: '💪', query: 'workout gym motivation',   gradient: 'linear-gradient(135deg,#f97316,#ea580c)' },
+    { label: 'Classic', emoji: '🎻', query: 'classical orchestral',     gradient: 'linear-gradient(135deg,#84cc16,#65a30d)' },
+    { label: 'Hip-Hop', emoji: '🎤', query: 'hip hop rap beats',        gradient: 'linear-gradient(135deg,#14b8a6,#0d9488)' },
+    { label: 'Sleep',   emoji: '🌙', query: 'sleep relaxing ambient',   gradient: 'linear-gradient(135deg,#312e81,#1e1b4b)' },
+  ];
+
+  constructor(
+    private apiService: ApiService,
+    public playerService: PlayerService,
+    public spotifyAuth: SpotifyAuthService
+  ) {}
+
+  ngOnInit() {
+    this.loadContent();
+    // Refresh greeting every 60s so it stays accurate if the app is left open
+    this.greetingTimer = setInterval(() => this.greeting.set(this.computeGreeting()), 60_000);
+  }
+
+  ngOnDestroy() {
+    clearInterval(this.greetingTimer);
+  }
+
+  async loadContent() {
+    this.loading = true;
+    this.pendingRequests = 2;
+
+    // Get a fresh, auto-refreshed Spotify token before fetching new releases
+    const spotifyToken = await this.spotifyAuth.getAccessToken().catch(() => null);
+
+    this.apiService.getSpotifyNewReleases(spotifyToken ?? undefined).subscribe({
+      next: (tracks) => { this.spotifyReleases = tracks; this.checkLoading(); },
+      error: () => this.checkLoading()
+    });
+
+    this.apiService.getYouTubeTrending().subscribe({
+      next: (tracks) => { this.youtubeTrending = tracks; this.checkLoading(); },
+      error: () => this.checkLoading()
+    });
+  }
+
+  private pendingRequests = 2;
+  private checkLoading() {
+    this.pendingRequests--;
+    // Turn off loading once both requests have settled (success or error)
+    if (this.pendingRequests <= 0) {
+      this.loading = false;
+    }
+  }
+
+  async selectMood(mood: MoodChip) {
+    this.activeMood = mood;
+    this.moodTracks = [];
+    this.moodSource = 'all';
+    this.loadingMood = true;
+
+    try {
+      const token = await this.spotifyAuth.getAccessToken();
+      // Fetch Spotify and YouTube in parallel; Spotify gracefully returns [] if restricted
+      const [spotifyTracks, youtubeTracks] = await Promise.all([
+        token
+          ? this.apiService.searchSpotifyByMood(mood.query, token).catch(() => [] as UnifiedTrack[])
+          : Promise.resolve([] as UnifiedTrack[]),
+        new Promise<UnifiedTrack[]>(resolve =>
+          this.apiService.search(mood.query, 'youtube').subscribe({
+            next: r => resolve(r.youTubeResults ?? []),
+            error: () => resolve([])
+          })
+        )
+      ]);
+      this.moodTracks = [...spotifyTracks, ...youtubeTracks];
+      this.moodSource = 'all';
+    } catch (e) {
+      console.error('Mood search failed:', e);
+      this.moodTracks = [];
+    } finally {
+      this.loadingMood = false;
+    }
+  }
+
+  setMoodSource(src: 'all' | 'spotify' | 'youtube') {
+    this.moodSource = src;
+  }
+
+  clearMood() {
+    this.activeMood = null;
+    this.moodTracks = [];
+  }
+
+  playAll(tracks: UnifiedTrack[]) {
+    if (tracks.length > 0) this.playerService.play(tracks[0], tracks);
+  }
+
+  connectSpotify() {
+    this.spotifyAuth.login();
+  }
+
+  retrySpotify() {
+    this.spotifyReleases = [];
+    this.loading = true;
+    this.loadContent();
+  }
+
+  private computeGreeting(): string {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning 🌅';
+    if (hour < 18) return 'Good Afternoon ☀️';
+    return 'Good Evening 🌙';
+  }
+}
