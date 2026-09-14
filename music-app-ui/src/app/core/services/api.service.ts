@@ -37,8 +37,8 @@ export class ApiService {
     return this.http.get<UnifiedTrack[]>(`${this.baseUrl}/spotify/new-releases`, { headers });
   }
 
-  getYouTubeTrending(): Observable<UnifiedTrack[]> {
-    return this.http.get<UnifiedTrack[]>(`${this.baseUrl}/youtube/trending`);
+  getYouTubeTrending(region: string = 'US'): Observable<UnifiedTrack[]> {
+    return this.http.get<UnifiedTrack[]>(`${this.baseUrl}/youtube/trending?region=${region}`);
   }
 
   /** Search Spotify tracks by mood/genre query string */

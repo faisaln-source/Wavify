@@ -65,14 +65,14 @@ public class YouTubeService
         return tracks;
     }
 
-    public async Task<List<UnifiedTrack>> GetTrendingMusicAsync()
+    public async Task<List<UnifiedTrack>> GetTrendingMusicAsync(string regionCode = "US")
     {
         var apiKey = _config["YouTube:ApiKey"];
         if (string.IsNullOrEmpty(apiKey))
             return GetDemoTrending();
 
         var response = await _httpClient.GetAsync(
-            $"videos?part=snippet,contentDetails&chart=mostPopular&videoCategoryId=10&maxResults=20&key={apiKey}");
+            $"videos?part=snippet,contentDetails&chart=mostPopular&videoCategoryId=10&regionCode={regionCode}&maxResults=20&key={apiKey}");
 
         if (!response.IsSuccessStatusCode)
             return GetDemoTrending();

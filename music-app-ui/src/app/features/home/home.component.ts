@@ -13,6 +13,12 @@ interface MoodChip {
   gradient: string;
 }
 
+interface TrendingRegion {
+  code: string;
+  label: string;
+  flag: string;
+}
+
 @Component({
   selector: 'app-home',
   standalone: true,
@@ -144,12 +150,22 @@ interface MoodChip {
 
         <!-- YouTube Column -->
         <div class="panel" *ngIf="youtubeTrending.length">
-          <div class="panel-header">
-            <h2>Trending Music <span class="badge badge-youtube">YouTube</span></h2>
-            <button class="show-more-btn" *ngIf="youtubeTrending.length > 10"
-                    (click)="showAllYouTube = !showAllYouTube">
-              {{ showAllYouTube ? 'Show Less' : 'Show All (' + youtubeTrending.length + ')' }}
-            </button>
+          <div class="panel-header" style="flex-direction: column; align-items: flex-start; gap: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+              <h2>Trending Music <span class="badge badge-youtube">YouTube</span></h2>
+              <button class="show-more-btn" *ngIf="youtubeTrending.length > 10"
+                      (click)="showAllYouTube = !showAllYouTube">
+                {{ showAllYouTube ? 'Show Less' : 'Show All (' + youtubeTrending.length + ')' }}
+              </button>
+            </div>
+            <div class="region-selector">
+              <button *ngFor="let r of trendingRegions" 
+                      class="region-btn" 
+                      [class.active]="activeRegion.code === r.code"
+                      (click)="setRegion(r)">
+                <span class="region-flag">{{ r.flag }}</span> {{ r.label }}
+              </button>
+            </div>
           </div>
           <div class="panel-tracks">
             <app-track-card
@@ -420,6 +436,17 @@ interface MoodChip {
     }
     .show-more-btn:hover { background: rgba(167,139,250,0.15); border-color: rgba(167,139,250,0.4); }
 
+    .region-selector { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; width: 100%; -webkit-overflow-scrolling: touch; }
+    .region-selector::-webkit-scrollbar { display: none; }
+    .region-btn {
+      font-size: 11px; font-weight: 600; color: var(--text-secondary);
+      padding: 4px 10px; border-radius: 100px; border: 1px solid var(--border-subtle);
+      background: transparent; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+    }
+    .region-btn:hover { color: var(--text-primary); border-color: rgba(255,0,0,0.3); }
+    .region-btn.active { background: rgba(255,0,0,0.1); color: #ff4444; border-color: rgba(255,68,68,0.4); }
+    .region-flag { margin-right: 2px; }
+
     .panel-tracks { padding: 4px 6px 10px; }
 
     .empty-state { padding: 40px; text-align: center; color: var(--text-tertiary); font-size: 14px; }
@@ -460,6 +487,14 @@ export class HomeComponent implements OnInit, OnDestroy {
   loading = true;
   showAllSpotify = false;
   showAllYouTube = false;
+
+  trendingRegions: TrendingRegion[] = [
+    { code: 'US', label: 'Global', flag: '🌍' },
+    { code: 'ES', label: 'Latin', flag: '🇪🇸' },
+    { code: 'KR', label: 'K-Pop', flag: '🇰🇷' },
+    { code: 'IN', label: 'Indian', flag: '🇮🇳' },
+  ];
+  activeRegion: TrendingRegion = this.trendingRegions[0];
 
   greeting = signal(this.computeGreeting());
   private greetingTimer: any;
@@ -516,7 +551,19 @@ export class HomeComponent implements OnInit, OnDestroy {
       error: () => this.checkLoading()
     });
 
-    this.apiService.getYouTubeTrending().subscribe({
+    this.apiService.getYouTubeTrending(this.activeRegion.code).subscribe({
+      next: (tracks) => { this.youtubeTrending = tracks; this.checkLoading(); },
+      error: () => this.checkLoading()
+    });
+  }
+
+  setRegion(region: TrendingRegion) {
+    if (this.activeRegion.code === region.code) return;
+    this.activeRegion = region;
+    
+    this.loading = true;
+    this.pendingRequests = 1;
+    this.apiService.getYouTubeTrending(region.code).subscribe({
       next: (tracks) => { this.youtubeTrending = tracks; this.checkLoading(); },
       error: () => this.checkLoading()
     });

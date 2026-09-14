@@ -15,9 +15,9 @@ public class YouTubeController : ControllerBase
     }
 
     [HttpGet("trending")]
-    public async Task<IActionResult> GetTrending()
+    public async Task<IActionResult> GetTrending([FromQuery] string region = "US")
     {
-        var trending = await _youtubeService.GetTrendingMusicAsync();
+        var trending = await _youtubeService.GetTrendingMusicAsync(region);
         return Ok(trending);
     }
 
