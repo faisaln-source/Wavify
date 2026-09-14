@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface ChatMessage {
   role: 'user' | 'model';
@@ -20,7 +21,7 @@ export interface ChatResponse {
 
 @Injectable({ providedIn: 'root' })
 export class ChatService {
-  private readonly apiUrl = '/api/chat';
+  private readonly apiUrl = `${environment.apiUrl}/chat`;
 
   history = signal<ChatMessage[]>([]);
 
