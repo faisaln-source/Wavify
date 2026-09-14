@@ -11,7 +11,7 @@ import { LocalPlaylist } from '../../core/models/track.model';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="track-card" (click)="onPlay()" [class.active]="isCurrentTrack()" id="track-{{ track.id }}">
+    <div class="track-card" (click)="onPlay()" [class.active]="isCurrentTrack()" [class.dropdown-active]="dropdownOpen" id="track-{{ track.id }}">
       <div class="track-number" *ngIf="index !== undefined">
         <span class="num" *ngIf="!isCurrentTrack()">{{ index + 1 }}</span>
         <div class="eq-mini" *ngIf="isCurrentTrack()">
@@ -83,6 +83,7 @@ import { LocalPlaylist } from '../../core/models/track.model';
     }
     .track-card:hover { background: var(--bg-card-hover); transform: translateX(4px); }
     .track-card.active { background: rgba(167,139,250,0.08); border-left: 3px solid var(--accent-primary); }
+    .track-card.dropdown-active { z-index: 50; }
 
     .track-number { width: 24px; text-align: center; flex-shrink: 0; }
     .num { font-size: 14px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
