@@ -11,7 +11,7 @@ public class ChatService
 {
     private readonly HttpClient _http;
     private const string ApiUrl = "https://api.groq.com/openai/v1/chat/completions";
-    private const string Model = "llama3-8b-8192";
+    private const string Model = "groq/compound";
 
     public ChatService(HttpClient http, IConfiguration config)
     {
@@ -50,19 +50,28 @@ public class ChatService
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadAsStringAsync();
-            if ((int)response.StatusCode == 429)
+            if ((int)response.StatusCode == 429 || error.Contains("rate_limit"))
                 return new ChatResult("I'm a bit busy right now 🎵 Please wait a few seconds and try again!", null);
-            throw new Exception($"Groq API error {response.StatusCode}: {error}");
+            
+            // For other API errors, log them or return a generic graceful message so we don't return 500
+            return new ChatResult("Oops, I encountered a hiccup on my end. Please try again! 🎵", null);
         }
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var raw = result
-            .GetProperty("choices")[0]
-            .GetProperty("message")
-            .GetProperty("content")
-            .GetString() ?? "{}";
-
-        return ParseResponse(raw);
+        
+        try
+        {
+            var raw = result
+                .GetProperty("choices")[0]
+                .GetProperty("message")
+                .GetProperty("content")
+                .GetString() ?? "{}";
+            return ParseResponse(raw);
+        }
+        catch
+        {
+            return new ChatResult("I got confused processing that, could you try asking differently? 🎵", null);
+        }
     }
 
     private ChatResult ParseResponse(string raw)
