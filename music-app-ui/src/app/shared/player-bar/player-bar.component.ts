@@ -556,13 +556,13 @@ import { FavoritesService } from '../../core/services/favorites.service';
     @media (max-width: 768px) {
       .player-bar {
         grid-template-columns: 1fr auto auto;
-        padding: 0 12px;
-        gap: 10px;
+        padding: 0 16px;
+        gap: 12px;
         height: 100%;
       }
 
-      /* Hide shuffle & repeat on mobile */
-      #btn-shuffle, #btn-repeat { display: none; }
+      /* Hide shuffle, repeat & volume on mobile */
+      #btn-shuffle, #btn-repeat, .volume-control { display: none; }
 
       /* Hide progress time labels */
       .time-display { display: none; }

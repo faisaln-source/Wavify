@@ -168,6 +168,7 @@ import { CommonModule } from '@angular/common';
       .main-content {
         grid-column: 1;
         grid-row: 2;
+        padding-bottom: 130px; /* Space for player bar and bottom nav */
       }
 
       .player-wrapper {

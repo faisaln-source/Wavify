@@ -1,4 +1,4 @@
-﻿import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TrackCardComponent } from '../../shared/track-card/track-card.component';
@@ -536,12 +536,13 @@ import { firstValueFrom, Subscription } from 'rxjs';
     @media (max-width: 768px) {
       .library-page { padding: 14px 14px; padding-bottom: 20px; }
 
-      .page-header h1 { font-size: 22px; }
-      .page-header p { font-size: 13px; }
+        .page-header h1 { font-size: 22px; }
+        .page-header p { font-size: 13px; }
 
-      .library-tabs { gap: 6px; margin-bottom: 16px; }
-      .tab { padding: 8px 14px; font-size: 13px; gap: 6px; }
-      .tab svg { width: 14px; height: 14px; }
+        .library-tabs { gap: 6px; margin-bottom: 16px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+        .library-tabs::-webkit-scrollbar { display: none; }
+        .tab { padding: 8px 14px; font-size: 13px; gap: 6px; white-space: nowrap; }
+        .tab svg { width: 14px; height: 14px; }
 
       .playlists-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
 

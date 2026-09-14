@@ -462,24 +462,26 @@ interface TrendingRegion {
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Mobile ── */
-    @media (max-width: 768px) {
-      .home-page { padding: 14px 14px; padding-bottom: 16px; }
+      /* ── Mobile ── */
+      @media (max-width: 768px) {
+        .home-page { padding: 14px 14px; padding-bottom: 32px; }
 
-      .hero-section { grid-template-columns: 1fr; gap: 10px; margin-bottom: 18px; }
-      .hero-card { min-height: 110px; }
+        .hero-section { grid-template-columns: 1fr; gap: 10px; margin-bottom: 18px; }
+        .hero-card { min-height: 110px; }
 
-      .mood-chips { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
-      .mood-chips::-webkit-scrollbar { display: none; }
+        .mood-chips { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+        .mood-chips::-webkit-scrollbar { display: none; }
+        .mood-chip svg, .mood-chip span:first-child { margin-top: 2px; }
 
-      .dual-panel, .dual-panel.single-panel { grid-template-columns: 1fr; gap: 16px; }
+        .dual-panel, .dual-panel.single-panel { grid-template-columns: 1fr; gap: 16px; }
 
-      .spotify-cta-banner { flex-wrap: wrap; }
+        .spotify-cta-banner { flex-direction: column; align-items: stretch; gap: 12px; text-align: center; }
+        .spotify-cta-banner .cta-icon { margin: 0 auto; }
 
-      .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
-      .source-toggle { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    }
-  `]
+        .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+        .source-toggle { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      }
+    `]
 })
 export class HomeComponent implements OnInit, OnDestroy {
   spotifyReleases: UnifiedTrack[] = [];

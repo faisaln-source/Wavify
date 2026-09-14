@@ -373,12 +373,23 @@ interface DisplayMessage {
     .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .send-btn svg { width: 18px; height: 18px; }
 
-    /* Mobile */
-    @media (max-width: 768px) {
-      .chat-panel { right: 8px; left: 8px; width: auto; bottom: calc(var(--player-height) + 70px); height: 480px; }
-      .chat-fab { right: 12px; bottom: calc(var(--player-height) + 12px); }
-    }
-  `]
+      /* Mobile */
+      @media (max-width: 768px) {
+        .chat-panel { 
+          top: 52px; 
+          bottom: 0; 
+          left: 0; 
+          right: 0; 
+          width: auto; 
+          height: auto; 
+          border-radius: 0; 
+          z-index: 1000; 
+          border: none;
+        }
+        .chat-fab { right: 12px; bottom: calc(var(--player-height) + 68px); }
+        .wake-fab { right: 12px; bottom: calc(var(--player-height) + 68px); }
+      }
+    `]
 })
 export class ChatPanelComponent implements OnInit, OnDestroy, AfterViewChecked {
   @ViewChild('messagesArea') messagesArea!: ElementRef<HTMLDivElement>;
