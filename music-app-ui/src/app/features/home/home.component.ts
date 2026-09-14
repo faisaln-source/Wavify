@@ -416,7 +416,6 @@ interface TrendingRegion {
       background: var(--bg-card);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
-      overflow: hidden;
       animation: fadeIn 0.5s ease forwards;
     }
 
