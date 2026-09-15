@@ -1,10 +1,12 @@
 import { Component, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { TrackCardComponent } from '../../shared/track-card/track-card.component';
 import { ApiService } from '../../core/services/api.service';
 import { PlayerService } from '../../core/services/player.service';
 import { SpotifyAuthService } from '../../core/services/spotify-auth.service';
-import { UnifiedTrack } from '../../core/models/track.model';
+import { UnifiedTrack, SearchResponse, PlaylistInfo } from '../../core/models/track.model';
+import { Subject, debounceTime, distinctUntilChanged, switchMap, of, forkJoin } from 'rxjs';
 
 interface MoodChip {
   label: string;
@@ -22,7 +24,7 @@ interface TrendingRegion {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, TrackCardComponent],
+  imports: [CommonModule, FormsModule, TrackCardComponent],
   template: `
     <div class="home-page">
       <header class="page-header">
@@ -30,7 +32,82 @@ interface TrendingRegion {
           <h1 class="gradient-text">{{ greeting() }}</h1>
           <p>Discover music from Spotify and YouTube in one place.</p>
         </div>
+
+        <!-- Inline search bar -->
+        <div class="home-search-bar" id="home-search-bar">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input
+            type="text"
+            class="search-input"
+            placeholder="Search songs, artists, playlists..."
+            [(ngModel)]="searchQuery"
+            (ngModelChange)="onSearchInput($event)"
+            id="home-search-input"
+          />
+          <div class="search-spinner" *ngIf="searchLoading">
+            <div class="spin"></div>
+          </div>
+          <button class="search-clear" *ngIf="searchQuery && !searchLoading" (click)="clearSearch()" id="btn-home-clear-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <!-- Search filter tabs -->
+        <div class="search-tabs" *ngIf="searchQuery && hasSearchResults()">
+          <button class="stab" [class.active]="searchTab==='all'"     (click)="searchTab='all'"     id="stab-all">All</button>
+          <button class="stab" [class.active]="searchTab==='spotify'" (click)="searchTab='spotify'" id="stab-spotify">
+            <span class="stab-dot spotify"></span>Spotify
+          </button>
+          <button class="stab" [class.active]="searchTab==='youtube'" (click)="searchTab='youtube'" id="stab-youtube">
+            <span class="stab-dot youtube"></span>YouTube
+          </button>
+        </div>
       </header>
+
+      <!-- ── SEARCH RESULTS (shown when query is active) ── -->
+      <ng-container *ngIf="searchQuery">
+        <div class="search-results-panel" *ngIf="hasSearchResults(); else noResults">
+          <!-- Spotify results -->
+          <section *ngIf="(searchTab==='all' || searchTab==='spotify') && searchResults.spotifyResults.length">
+            <div class="results-label" *ngIf="searchTab==='all'">
+              <span class="badge badge-spotify">♫ Spotify</span>
+              <span class="results-count">{{ searchResults.spotifyResults.length }}</span>
+            </div>
+            <div class="panel-tracks">
+              <app-track-card
+                *ngFor="let t of searchResults.spotifyResults; let i = index"
+                [track]="t" [index]="i" [playlist]="searchResults.spotifyResults">
+              </app-track-card>
+            </div>
+          </section>
+
+          <!-- YouTube results -->
+          <section *ngIf="(searchTab==='all' || searchTab==='youtube') && searchResults.youTubeResults.length">
+            <div class="results-label" *ngIf="searchTab==='all'">
+              <span class="badge badge-youtube">▶ YouTube</span>
+              <span class="results-count">{{ searchResults.youTubeResults.length }}</span>
+            </div>
+            <div class="panel-tracks">
+              <app-track-card
+                *ngFor="let t of searchResults.youTubeResults; let i = index"
+                [track]="t" [index]="i" [playlist]="searchResults.youTubeResults">
+              </app-track-card>
+            </div>
+          </section>
+        </div>
+
+        <ng-template #noResults>
+          <div class="search-empty" *ngIf="!searchLoading">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <p>No results for <strong>"{{ searchQuery }}"</strong></p>
+          </div>
+        </ng-template>
+      </ng-container>
+
+      <!-- Normal home content — hidden while searching -->
+      <ng-container *ngIf="!searchQuery">
 
       <!-- Mood/Genre Chips -->
       <section class="mood-section">
@@ -180,6 +257,8 @@ interface TrendingRegion {
         <div class="spinner"></div>
         <span>Loading your music...</span>
       </div>
+
+      </ng-container><!-- /!searchQuery -->
     </div>
   `,
   styles: [`
@@ -192,6 +271,71 @@ interface TrendingRegion {
     }
 
     .page-header { margin-bottom: 20px; }
+
+    /* ── Inline Search Bar ── */
+    .home-search-bar {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--bg-card); border: 1px solid var(--border-subtle);
+      border-radius: 14px; padding: 0 14px; height: 48px;
+      margin-top: 16px;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .home-search-bar:focus-within {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px rgba(167,139,250,0.15);
+    }
+    .home-search-bar .search-icon { width: 18px; height: 18px; color: var(--text-tertiary); flex-shrink: 0; }
+    .home-search-bar .search-input {
+      flex: 1; background: none; border: none; outline: none;
+      color: var(--text-primary); font-size: 14px; font-family: inherit;
+      min-width: 0;
+    }
+    .home-search-bar .search-input::placeholder { color: var(--text-tertiary); }
+    .home-search-bar .search-clear {
+      width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      color: var(--text-tertiary); transition: all var(--transition-fast); flex-shrink: 0;
+    }
+    .home-search-bar .search-clear:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+    .home-search-bar .search-clear svg { width: 14px; height: 14px; }
+    .home-search-bar .search-spinner { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .home-search-bar .spin {
+      width: 18px; height: 18px; border: 2px solid var(--border-medium);
+      border-top-color: var(--accent-primary); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* Filter tabs */
+    .search-tabs {
+      display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;
+    }
+    .stab {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: 100px; font-size: 13px; font-weight: 600;
+      border: 1px solid var(--border-subtle); color: var(--text-secondary);
+      background: var(--bg-card); transition: all var(--transition-fast); cursor: pointer;
+    }
+    .stab.active { background: var(--accent-primary); color: white; border-color: var(--accent-primary); }
+    .stab-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .stab-dot.spotify { background: #1db954; }
+    .stab-dot.youtube { background: #ff0000; }
+
+    /* Search results panel */
+    .search-results-panel { margin-top: 20px; }
+    .results-label {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 0 4px;
+    }
+    .results-count {
+      font-size: 12px; color: var(--text-tertiary); font-weight: 600;
+      background: var(--bg-card); border: 1px solid var(--border-subtle);
+      padding: 2px 8px; border-radius: 100px;
+    }
+    .search-empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 60px 20px; text-align: center; color: var(--text-tertiary);
+    }
+    .search-empty svg { width: 48px; height: 48px; margin-bottom: 14px; opacity: 0.4; }
+    .search-empty p { font-size: 14px; }
+    .search-empty strong { color: var(--text-primary); }
 
     .greeting h1 {
       font-size: 30px;
@@ -503,6 +647,14 @@ export class HomeComponent implements OnInit, OnDestroy {
   greeting = signal(this.computeGreeting());
   private greetingTimer: any;
 
+  // ── Inline search state ──
+  searchQuery = '';
+  searchResults: SearchResponse = { query: '', spotifyResults: [], youTubeResults: [] };
+  searchTab: 'all' | 'spotify' | 'youtube' = 'all';
+  searchLoading = false;
+  private searchSubject = new Subject<string>();
+  private searchSub: any;
+
   // Mood state
   activeMood: MoodChip | null = null;
   moodTracks: UnifiedTrack[] = [];  // all tracks (spotify + youtube)
@@ -531,7 +683,29 @@ export class HomeComponent implements OnInit, OnDestroy {
     private apiService: ApiService,
     public playerService: PlayerService,
     public spotifyAuth: SpotifyAuthService
-  ) {}
+  ) {
+    this.searchSub = this.searchSubject.pipe(
+      debounceTime(380),
+      distinctUntilChanged(),
+      switchMap(q => {
+        if (!q.trim()) {
+          this.searchResults = { query: '', spotifyResults: [], youTubeResults: [] };
+          this.searchLoading = false;
+          return of(null);
+        }
+        this.searchLoading = true;
+        return forkJoin({
+          tracks: this.apiService.search(q)
+        });
+      })
+    ).subscribe({
+      next: (res) => {
+        if (res) this.searchResults = res.tracks;
+        this.searchLoading = false;
+      },
+      error: () => { this.searchLoading = false; }
+    });
+  }
 
   ngOnInit() {
     this.loadContent();
@@ -541,6 +715,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     clearInterval(this.greetingTimer);
+    this.searchSub?.unsubscribe();
   }
 
   async loadContent() {
@@ -623,6 +798,23 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   playAll(tracks: UnifiedTrack[]) {
     if (tracks.length > 0) this.playerService.play(tracks[0], tracks);
+  }
+
+  // ── Search methods ──
+  onSearchInput(q: string) {
+    this.searchSubject.next(q);
+  }
+
+  clearSearch() {
+    this.searchQuery = '';
+    this.searchResults = { query: '', spotifyResults: [], youTubeResults: [] };
+    this.searchTab = 'all';
+    this.searchLoading = false;
+  }
+
+  hasSearchResults(): boolean {
+    return this.searchResults.spotifyResults.length > 0 ||
+           this.searchResults.youTubeResults.length > 0;
   }
 
   connectSpotify() {
