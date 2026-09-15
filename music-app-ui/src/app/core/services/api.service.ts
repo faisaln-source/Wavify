@@ -55,6 +55,13 @@ export class ApiService {
     );
   }
 
+  /** Universal AI trending — context = any music context, fallback = search query if AI fails */
+  getYouTubeAITrending(context: string, fallback: string = ''): Observable<UnifiedTrack[]> {
+    return this.http.get<UnifiedTrack[]>(
+      `${this.baseUrl}/youtube/ai-trending?context=${encodeURIComponent(context)}&fallback=${encodeURIComponent(fallback)}`
+    );
+  }
+
   /** Search Spotify tracks by mood/genre query string */
   async searchSpotifyByMood(query: string, token?: string): Promise<UnifiedTrack[]> {
     let headers = new HttpHeaders();

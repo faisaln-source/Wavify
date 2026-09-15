@@ -22,8 +22,21 @@ public class YouTubeController : ControllerBase
     }
 
     /// <summary>
-    /// Uses Groq AI to identify trending songs for a language, then fetches them from YouTube.
-    /// Falls back to viewCount search if AI is unavailable.
+    /// Universal AI trending — context can be any music context string:
+    /// "Global pop", "Latin", "K-Pop", "Malayalam music", "songs similar to X by Y", etc.
+    /// </summary>
+    [HttpGet("ai-trending")]
+    public async Task<IActionResult> GetAITrending([FromQuery] string context, [FromQuery] string fallback = "")
+    {
+        if (string.IsNullOrWhiteSpace(context))
+            return BadRequest("Query parameter 'context' is required");
+
+        var results = await _youtubeService.GetAITrendingAsync(context, fallback);
+        return Ok(results);
+    }
+
+    /// <summary>
+    /// Convenience endpoint for language-specific trending (delegates to ai-trending).
     /// </summary>
     [HttpGet("ai-trending-language")]
     public async Task<IActionResult> GetAITrendingLanguage([FromQuery] string language)

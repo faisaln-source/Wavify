@@ -19,15 +19,15 @@ public class YouTubeService
     }
 
     /// <summary>
-    /// Uses Groq AI to get the top 10 currently trending songs for a language,
-    /// then fetches each from YouTube for accurate video IDs and thumbnails.
+    /// Universal AI-powered trending: asks Groq to list top 10 songs for any context
+    /// (language, region, similarity), then fetches each from YouTube.
+    /// Falls back to viewCount search using fallbackQuery if AI is unavailable.
     /// </summary>
-    public async Task<List<UnifiedTrack>> GetAITrendingLanguageAsync(string language)
+    public async Task<List<UnifiedTrack>> GetAITrendingAsync(string context, string fallbackQuery = "")
     {
         var groqKey = _config["Groq:ApiKey"];
         var ytKey = _config["YouTube:ApiKey"];
 
-        // Step 1: Ask Groq for the top trending songs
         List<string> songQueries = new();
         if (!string.IsNullOrEmpty(groqKey))
         {
@@ -38,22 +38,23 @@ public class YouTubeService
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", groqKey);
 
                 var prompt = $"""
-                    List the top 10 most trending and popular {language} songs RIGHT NOW in 2025-2026.
-                    Return ONLY a JSON array of strings in this exact format, nothing else:
+                    You are a music expert with up-to-date knowledge of charts and viral songs.
+                    List the top 10 most trending and popular {context} songs RIGHT NOW in 2025-2026.
+                    Return ONLY a valid JSON array of strings, nothing else — no markdown, no explanation:
                     ["Song Name - Artist Name", "Song Name - Artist Name", ...]
-                    Focus on recent viral hits, chart-toppers, and songs with millions of views.
-                    Do NOT include old songs from before 2024. Do NOT add explanations.
+                    Rules:
+                    - Focus on songs released in 2024-2026 that are currently viral or charting.
+                    - Include songs with millions of streams/views right now.
+                    - DO NOT include old songs unless they are currently trending again.
+                    - Each entry must be "Song Title - Artist Name" format.
                     """;
 
                 var payload = new
                 {
                     model = "llama-3.1-8b-instant",
-                    messages = new[]
-                    {
-                        new { role = "user", content = prompt }
-                    },
-                    temperature = 0.3,
-                    max_tokens = 512
+                    messages = new[] { new { role = "user", content = prompt } },
+                    temperature = 0.2,
+                    max_tokens = 600
                 };
 
                 var resp = await groqClient.PostAsJsonAsync("https://api.groq.com/openai/v1/chat/completions", payload);
@@ -61,31 +62,31 @@ public class YouTubeService
                 {
                     var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
                     var raw = json.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "[]";
-
-                    // Extract JSON array from response (handle markdown code fences)
                     var match = Regex.Match(raw, @"\[.*?\]", RegexOptions.Singleline);
                     if (match.Success)
-                    {
                         songQueries = JsonSerializer.Deserialize<List<string>>(match.Value) ?? new();
-                    }
                 }
             }
-            catch { /* Fall through to YouTube search fallback */ }
+            catch { /* Fall through to YouTube fallback */ }
         }
 
-        // Step 2: If AI gave us songs, search each on YouTube
+        // Fetch each AI-suggested song from YouTube in parallel
         if (songQueries.Count > 0 && !string.IsNullOrEmpty(ytKey))
         {
-            var tracks = new List<UnifiedTrack>();
             var fetchTasks = songQueries.Take(10).Select(q => FetchFirstYouTubeResult(q, ytKey));
             var results = await Task.WhenAll(fetchTasks);
-            tracks.AddRange(results.Where(t => t != null)!);
-            if (tracks.Count > 0) return tracks;
+            var tracks = results.Where(t => t != null).ToList()!;
+            if (tracks.Count > 0) return tracks!;
         }
 
-        // Step 3: Fallback to regular trending-language search
-        return await SearchTrendingLanguageAsync($"{language} song", 18);
+        // Fallback: viewCount search with provided fallback query
+        var fq = string.IsNullOrWhiteSpace(fallbackQuery) ? context : fallbackQuery;
+        return await SearchTrendingLanguageAsync(fq, 18);
     }
+
+    // Keep old method for backward compatibility — delegates to generalized version
+    public Task<List<UnifiedTrack>> GetAITrendingLanguageAsync(string language) =>
+        GetAITrendingAsync($"{language} music", $"{language} song");
 
     private async Task<UnifiedTrack?> FetchFirstYouTubeResult(string query, string apiKey)
     {

@@ -524,26 +524,24 @@ export class NowPlayingModalComponent implements OnDestroy {
     public favorites: FavoritesService,
     private apiService: ApiService
   ) {
-    // Auto-fetch similar tracks whenever the current track changes
+    // Auto-fetch similar tracks via AI whenever the current track changes
     this.trackSub = this.playerService.currentTrack$.pipe(
       switchMap(track => {
-        if (!track) { this.similarTracks = []; return of(null); }
+        if (!track) { this.similarTracks = []; return of([]); }
         this.loadingSimilar = true;
-        // Query: artist's recent/new songs — avoids pulling in the exact same track or playlists
-        const artist = track.artist.split(/[,&]/)[0].trim(); // first artist if multiple
-        const q = `${artist} new songs 2024 official`;
-        return this.apiService.search(q, 'youtube');
+        const artist = track.artist.split(/[,&]/)[0].trim();
+        // AI context: "songs similar to X by Y" gives semantically related recent tracks
+        const context = `songs similar to ${track.title} by ${artist}`;
+        const fallback = `${artist} songs`;
+        return this.apiService.getYouTubeAITrending(context, fallback);
       })
     ).subscribe({
-      next: (res) => {
-        if (res) {
-          const currentId = this.playerService.currentTrackSnapshot?.id;
-          this.similarTracks = res.youTubeResults
-            .filter((t: UnifiedTrack) => t.id !== currentId)
-            .filter((t: UnifiedTrack) => !this.isJunk(t))
-            .filter((t: UnifiedTrack) => !t.durationMs || t.durationMs < 600_000) // skip >10 min
-            .slice(0, 10);
-        }
+      next: (tracks: UnifiedTrack[]) => {
+        const currentId = this.playerService.currentTrackSnapshot?.id;
+        this.similarTracks = (tracks || [])
+          .filter((t: UnifiedTrack) => t.id !== currentId)
+          .filter((t: UnifiedTrack) => !this.isJunk(t))
+          .slice(0, 10);
         this.loadingSimilar = false;
       },
       error: () => { this.loadingSimilar = false; }

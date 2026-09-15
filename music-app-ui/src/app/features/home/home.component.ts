@@ -697,6 +697,13 @@ export class HomeComponent implements OnInit, OnDestroy {
     { code: 'KR', label: 'K-Pop', flag: '🇰🇷' },
     { code: 'IN', label: 'Indian', flag: '🇮🇳' },
   ];
+  /** AI context strings per region — fed to Groq to identify what's trending */
+  private readonly regionAIContexts: Record<string, string> = {
+    'US': 'global pop English trending',
+    'ES': 'Latin Spanish trending pop reggaeton',
+    'KR': 'K-Pop Korean trending',
+    'IN': 'Indian Bollywood Hindi trending',
+  };
   activeRegion: TrendingRegion = this.trendingRegions[0];
 
   // ── India language filter ──
@@ -815,22 +822,35 @@ export class HomeComponent implements OnInit, OnDestroy {
       error: () => this.checkLoading()
     });
 
-    this.apiService.getYouTubeTrending(this.activeRegion.code).subscribe({
+    const aiContext = this.regionAIContexts[this.activeRegion.code] ?? 'global trending pop';
+    this.apiService.getYouTubeAITrending(aiContext, this.activeRegion.label + ' trending songs').subscribe({
       next: (tracks) => { this.youtubeTrending = tracks; this.checkLoading(); },
-      error: () => this.checkLoading()
+      error: () => {
+        // Fallback to YouTube chart API
+        this.apiService.getYouTubeTrending(this.activeRegion.code).subscribe({
+          next: (tracks) => { this.youtubeTrending = tracks; this.checkLoading(); },
+          error: () => this.checkLoading()
+        });
+      }
     });
   }
 
   setRegion(region: TrendingRegion) {
     if (this.activeRegion.code === region.code) return;
     this.activeRegion = region;
-    this.activeLanguage = null; // clear language sub-filter when changing region
+    this.activeLanguage = null;
 
     this.loading = true;
     this.pendingRequests = 1;
-    this.apiService.getYouTubeTrending(region.code).subscribe({
+    const aiContext = this.regionAIContexts[region.code] ?? region.label + ' trending';
+    this.apiService.getYouTubeAITrending(aiContext, region.label + ' trending songs').subscribe({
       next: (tracks) => { this.youtubeTrending = tracks; this.checkLoading(); },
-      error: () => this.checkLoading()
+      error: () => {
+        this.apiService.getYouTubeTrending(region.code).subscribe({
+          next: (tracks) => { this.youtubeTrending = tracks; this.checkLoading(); },
+          error: () => this.checkLoading()
+        });
+      }
     });
   }
 
