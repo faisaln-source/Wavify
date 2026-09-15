@@ -463,7 +463,7 @@ interface TrendingRegion {
 
       /* ── Mobile ── */
       @media (max-width: 768px) {
-        .home-page { padding: 14px 14px; padding-bottom: 32px; }
+        .home-page { padding: 14px 14px; padding-bottom: 32px; overflow-x: hidden; }
 
         .hero-section { grid-template-columns: 1fr; gap: 10px; margin-bottom: 18px; }
         .hero-card { min-height: 110px; }

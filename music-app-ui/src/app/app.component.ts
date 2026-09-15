@@ -102,7 +102,7 @@ import { CommonModule } from '@angular/common';
     @media (max-width: 768px) {
       .app-shell {
         grid-template-columns: 1fr;
-        grid-template-rows: 52px 1fr auto 56px;
+        grid-template-rows: 52px 1fr 70px 56px;
       }
 
       /* Mobile top header */
@@ -168,7 +168,8 @@ import { CommonModule } from '@angular/common';
       .main-content {
         grid-column: 1;
         grid-row: 2;
-        padding-bottom: 130px; /* Space for player bar and bottom nav */
+        overflow-x: hidden;
+        padding-bottom: 0;
       }
 
       .player-wrapper {

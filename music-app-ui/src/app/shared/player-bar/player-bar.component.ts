@@ -30,6 +30,25 @@ import { FavoritesService } from '../../core/services/favorites.service';
         </div>
       </div>
 
+      <!-- Mobile-only controls: prev / play-pause / next -->
+      <div class="mobile-controls">
+        <button class="ctrl-btn" (click)="playerService.playPrevious()" title="Previous" id="mob-btn-prev">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+        </button>
+        <button class="play-pause-btn" (click)="playerService.togglePlayPause()" id="mob-btn-play-pause" [class.playing]="(playerService.isPlaying$ | async)">
+          <div class="btn-ripple"></div>
+          <ng-container *ngIf="(playerService.isPlaying$ | async); else mobPlayIcon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+          </ng-container>
+          <ng-template #mobPlayIcon>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72a1 1 0 001.5.86l11.04-6.86a1 1 0 000-1.72L9.5 4.28A1 1 0 008 5.14z"/></svg>
+          </ng-template>
+        </button>
+        <button class="ctrl-btn" (click)="playerService.playNext()" title="Next" id="mob-btn-next">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 18h2V6h-2zM6 18l8.5-6L6 6z"/></svg>
+        </button>
+      </div>
+
       <div class="player-center">
         <div class="control-buttons">
           <button class="ctrl-btn" (click)="playerService.toggleShuffle()" [class.active]="(playerService.shuffle$ | async)" title="Shuffle" id="btn-shuffle">
@@ -123,6 +142,9 @@ import { FavoritesService } from '../../core/services/favorites.service';
       border-top: 1px solid rgba(255, 255, 255, 0.06);
       transition: all var(--transition-base);
     }
+
+    /* Mobile-only controls: hidden on desktop */
+    .mobile-controls { display: none; }
 
     /* Ambient glow behind player */
     .ambient-glow {
@@ -554,37 +576,49 @@ import { FavoritesService } from '../../core/services/favorites.service';
 
     /* ── Mobile Player Bar ── */
     @media (max-width: 768px) {
-      .player-bar {
-        grid-template-columns: 1fr auto auto;
-        padding: 0 16px;
-        gap: 12px;
+      :host {
+        display: block;
         height: 100%;
       }
 
-      /* Hide shuffle, repeat & volume on mobile */
-      #btn-shuffle, #btn-repeat, .volume-control { display: none; }
+      .player-bar {
+        height: 100%;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        padding: 0 12px;
+        gap: 10px;
+      }
 
-      /* Hide progress time labels */
-      .time-display { display: none; }
+      /* Hide desktop-only sections */
+      .player-center { display: none; }
+      .player-right { display: none; }
 
-      /* Hide equalizer and volume bar — use only the volume button */
-      .mini-eq { display: none; }
-      .volume-track { display: none; }
+      /* Track info takes all remaining space */
+      .track-info {
+        flex: 1;
+        gap: 10px;
+        min-width: 0;
+        animation: none;
+      }
 
-      /* Make progress bar full width below track info on mobile */
-      .player-center { gap: 4px; }
-      .control-buttons { gap: 12px; }
-      .play-pause-btn { width: 38px; height: 38px; }
-      .play-pause-btn svg { width: 17px; height: 17px; }
-
-      .album-art { width: 44px; height: 44px; border-radius: 6px; }
+      .album-art { width: 44px; height: 44px; border-radius: 6px; flex-shrink: 0; }
       .album-art.spinning { border-radius: 50%; }
 
       .track-title { font-size: 13px; }
       .track-artist { font-size: 11px; }
-
-      /* Hide source badge on mobile to save space */
       .source-dot, .badge { display: none; }
+
+      /* Compact mobile controls (prev / play-pause / next) */
+      .mobile-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+
+      .play-pause-btn { width: 40px; height: 40px; }
+      .play-pause-btn svg { width: 18px; height: 18px; }
     }
   `]
 })

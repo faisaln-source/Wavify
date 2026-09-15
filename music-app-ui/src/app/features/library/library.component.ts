@@ -183,7 +183,7 @@ import { firstValueFrom, Subscription } from 'rxjs';
             </div>
             <div class="create-form" *ngIf="showCreateForm">
               <input #nameInput class="playlist-name-input" [(ngModel)]="newPlaylistName"
-                     placeholder="Playlist nameâ€¦" (keyup.enter)="confirmCreate()"
+                     placeholder="Playlist name..." (keyup.enter)="confirmCreate()"
                      (keyup.escape)="cancelCreate()" autofocus id="input-playlist-name"/>
               <button class="create-confirm-btn" (click)="confirmCreate()" id="btn-confirm-create">Create</button>
               <button class="create-cancel-btn" (click)="cancelCreate()" id="btn-cancel-create">Cancel</button>

@@ -189,6 +189,21 @@ import { LocalPlaylist } from '../../core/models/track.model';
     .badge-youtube { background: rgba(255,0,0,0.12); color: #ff4444; }
 
     .track-duration { font-size: 13px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+    /* ── Mobile Track Card ── */
+    @media (max-width: 768px) {
+      .track-card { gap: 10px; padding: 8px 10px; }
+      /* Prevent horizontal overflow from hover transform */
+      .track-card:hover { transform: none; }
+      /* Hide items that cause width overflow */
+      .badge { display: none; }
+      .track-duration { display: none; }
+      .playlist-add-wrap { display: none; }
+      .like-btn { display: none; }
+      /* Make track-meta text clamp properly */
+      .track-meta { min-width: 0; overflow: hidden; }
+      .track-thumb { width: 42px; height: 42px; }
+    }
   `]
 })
 export class TrackCardComponent {
