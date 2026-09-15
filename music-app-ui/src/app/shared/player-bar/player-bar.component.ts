@@ -583,33 +583,34 @@ import { FavoritesService } from '../../core/services/favorites.service';
 
       .player-bar {
         height: 100%;
-        display: flex;
-        flex-direction: row;
+        /* Grid: track-info gets remaining space, controls get fixed natural width */
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
         align-items: center;
         padding: 0 12px;
-        gap: 10px;
-        overflow: hidden; /* prevent long titles from escaping */
+        column-gap: 8px;
+        overflow: hidden;
       }
 
-      /* Hide desktop-only sections */
+      /* Hide desktop-only sections — they are display:none so don’t occupy grid cells */
       .player-center { display: none; }
       .player-right { display: none; }
 
-      /* Track info: flex-1 but MUST NOT grow beyond available space */
+      /* Track info occupies column 1 — minmax(0,1fr) keeps it bounded */
       .track-info {
-        flex: 1 1 0;       /* grow, shrink, basis 0 — never overflows */
-        min-width: 0;
-        max-width: 100%;
-        overflow: hidden;
+        display: flex;
+        align-items: center;
         gap: 10px;
+        min-width: 0;    /* critical for flex children to shrink */
+        overflow: hidden;
         animation: none;
       }
 
-      /* track-details must also clip so ellipsis works on the title */
+      /* Both text containers must propagate the overflow constraint */
       .track-details {
         min-width: 0;
         overflow: hidden;
-        width: 100%;
+        flex: 1 1 0;      /* grow from 0 so it never exceeds available space */
       }
 
       .album-art { width: 44px; height: 44px; border-radius: 6px; flex-shrink: 0; }
@@ -619,8 +620,7 @@ import { FavoritesService } from '../../core/services/favorites.service';
       .track-artist { font-size: 11px; }
       .source-dot, .badge { display: none; }
 
-
-      /* Compact mobile controls (prev / play-pause / next) */
+      /* Mobile controls occupy column 2 — ‘auto’ means natural width, never squeezed */
       .mobile-controls {
         display: flex;
         align-items: center;

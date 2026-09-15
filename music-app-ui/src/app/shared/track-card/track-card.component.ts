@@ -202,8 +202,8 @@ import { LocalPlaylist } from '../../core/models/track.model';
       .playlist-add-wrap { display: none; }
       .like-btn { display: none; }
       .track-number { display: none; }
-      /* Make track-meta text clamp properly */
-      .track-meta { min-width: 0; overflow: hidden; }
+      /* Fix flex chain: basis 0 ensures track-meta never exceeds its flex share */
+      .track-meta { flex: 1 1 0%; min-width: 0; overflow: hidden; }
       .track-thumb { width: 42px; height: 42px; }
     }
   `]
@@ -216,7 +216,6 @@ export class TrackCardComponent {
   @HostBinding('style.display') display = 'block';
   @HostBinding('style.position') position = 'relative';
   @HostBinding('style.maxWidth') maxWidth = '100%';
-  @HostBinding('style.overflow') hostOverflow = 'hidden';
   @HostBinding('style.zIndex') get zIndex() {
     return this.dropdownOpen ? 1000 : 1;
   }
