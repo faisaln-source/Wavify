@@ -112,13 +112,14 @@ import { FavoritesService } from '../../core/services/favorites.service';
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" *ngIf="(playerService.volume$ | async)! > 0 && (playerService.volume$ | async)! <= 50"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" *ngIf="(playerService.volume$ | async)! === 0"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
           </button>
-          <div class="volume-track"
-               (mousedown)="onVolumeDragStart($event)"
-               (touchstart)="onVolumeTouchStart($event)"
-               id="volume-bar">
-            <div class="volume-fill" [style.width.%]="(playerService.volume$ | async) || 0"></div>
-            <div class="volume-thumb" [style.left.%]="(playerService.volume$ | async) || 0"></div>
-          </div>
+          <input
+            type="range"
+            class="volume-range"
+            min="0" max="100" step="1"
+            [value]="(playerService.volume$ | async) ?? 50"
+            (input)="onVolumeInput($event)"
+            id="volume-bar"
+          />
         </div>
       </div>
     </div>
@@ -540,45 +541,54 @@ import { FavoritesService } from '../../core/services/favorites.service';
       gap: 8px;
     }
 
-    .volume-track {
+    /* ── Native volume range input ── */
+    .volume-range {
+      -webkit-appearance: none;
+      appearance: none;
       width: 100px;
       height: 4px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 10px;
+      border-radius: 100px;
+      outline: none;
       cursor: pointer;
-      position: relative;
+      /* Track fill is handled via background-size trick on the input itself */
+      background: rgba(255,255,255,0.15);
+      background-image: linear-gradient(var(--accent-primary), var(--accent-primary));
+      background-size: 50% 100%; /* updated via JS below but defaults to 50% */
+      background-repeat: no-repeat;
       transition: height var(--transition-fast);
     }
+    .volume-range:hover { height: 6px; }
 
-    .volume-track:hover {
-      height: 6px;
-    }
-
-    .volume-fill {
-      height: 100%;
-      background: var(--text-secondary);
-      border-radius: 10px;
-      transition: background var(--transition-fast);
-    }
-
-    .volume-track:hover .volume-fill {
-      background: var(--accent-primary);
-    }
-
-    .volume-thumb {
-      width: 12px;
-      height: 12px;
+    /* Thumb — WebKit (Chrome, Safari, Edge) */
+    .volume-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
       border-radius: 50%;
-      background: white;
-      position: absolute;
-      top: 50%;
-      transform: translate(-50%, -50%) scale(0);
-      transition: transform var(--transition-spring);
-      box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
+      background: #fff;
+      cursor: pointer;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.4);
+      transform: scale(0);
+      transition: transform var(--transition-fast);
     }
+    .volume-range:hover::-webkit-slider-thumb,
+    .volume-range:active::-webkit-slider-thumb { transform: scale(1); }
 
-    .volume-track:hover .volume-thumb {
-      transform: translate(-50%, -50%) scale(1);
+    /* Thumb — Firefox */
+    .volume-range::-moz-range-thumb {
+      width: 14px; height: 14px;
+      border-radius: 50%; border: none;
+      background: #fff;
+      cursor: pointer;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.4);
+    }
+    /* Track — Firefox */
+    .volume-range::-moz-range-track {
+      height: 4px; border-radius: 100px;
+      background: rgba(255,255,255,0.15);
+    }
+    .volume-range::-moz-range-progress {
+      height: 4px; border-radius: 100px;
+      background: var(--accent-primary);
     }
 
     /* ── Mobile Player Bar ── */
@@ -694,24 +704,13 @@ export class PlayerBarComponent {
     document.addEventListener('touchend', end);
   }
 
-  // ── Volume drag ───────────────────────────────────────
-  onVolumeDragStart(e: MouseEvent) {
-    e.preventDefault();
-    const bar = e.currentTarget as HTMLElement;
-    this.playerService.setVolume(this.pct(e.clientX, bar));
-    const move = (ev: MouseEvent) => this.playerService.setVolume(this.pct(ev.clientX, bar));
-    const up   = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
-    document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', up);
-  }
-
-  onVolumeTouchStart(e: TouchEvent) {
-    const bar = e.currentTarget as HTMLElement;
-    this.playerService.setVolume(this.pct(e.touches[0].clientX, bar));
-    const move = (ev: TouchEvent) => this.playerService.setVolume(this.pct(ev.touches[0].clientX, bar));
-    const end  = () => { document.removeEventListener('touchmove', move); document.removeEventListener('touchend', end); };
-    document.addEventListener('touchmove', move, { passive: true });
-    document.addEventListener('touchend', end);
+  // ── Native volume range ───────────────────────────────
+  onVolumeInput(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const v = parseFloat(input.value);
+    this.playerService.setVolume(v);
+    // Update the filled track via background-size (WebKit fill trick)
+    input.style.backgroundSize = `${v}% 100%`;
   }
 
   toggleMute() {
