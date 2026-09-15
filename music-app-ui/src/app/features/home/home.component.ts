@@ -701,17 +701,35 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   // ── India language filter ──
   indianLanguages = [
-    { code: 'hindi',     label: 'Hindi',     flag: '🎵', query: 'Hindi songs hits 2024' },
-    { code: 'tamil',     label: 'Tamil',     flag: '🎶', query: 'Tamil songs trending kollywood' },
-    { code: 'telugu',    label: 'Telugu',    flag: '🎼', query: 'Telugu songs tollywood hits' },
-    { code: 'kannada',   label: 'Kannada',   flag: '🎹', query: 'Kannada songs sandalwood new' },
-    { code: 'punjabi',   label: 'Punjabi',   flag: '🥁', query: 'Punjabi songs bhangra hits 2024' },
-    { code: 'malayalam', label: 'Malayalam', flag: '🪗', query: 'Malayalam songs mollywood hits' },
-    { code: 'bengali',   label: 'Bengali',   flag: '🎷', query: 'Bengali songs Bangla hits 2024' },
-    { code: 'bhojpuri',  label: 'Bhojpuri',  flag: '🎺', query: 'Bhojpuri songs new 2024' },
+    { code: 'hindi',     label: 'Hindi',     flag: '🎵', query: 'new Hindi song 2024 official video' },
+    { code: 'tamil',     label: 'Tamil',     flag: '🎶', query: 'new Tamil song 2024 official video kollywood' },
+    { code: 'telugu',    label: 'Telugu',    flag: '🎼', query: 'new Telugu song 2024 official video tollywood' },
+    { code: 'kannada',   label: 'Kannada',   flag: '🎹', query: 'new Kannada song 2024 official video sandalwood' },
+    { code: 'punjabi',   label: 'Punjabi',   flag: '🥁', query: 'new Punjabi song 2024 official video' },
+    { code: 'malayalam', label: 'Malayalam', flag: '🪗', query: 'new Malayalam song 2024 official video mollywood' },
+    { code: 'bengali',   label: 'Bengali',   flag: '🎷', query: 'new Bengali song 2024 official video' },
+    { code: 'bhojpuri',  label: 'Bhojpuri',  flag: '🎺', query: 'new Bhojpuri song 2024 official video' },
   ];
   activeLanguage: typeof this.indianLanguages[0] | null = null;
   loadingLanguage = false;
+
+  private readonly SONG_JUNK_KEYWORDS = [
+    'jukebox', 'playlist', 'nonstop', 'non stop', 'compilation', 'mashup',
+    'full album', 'best of', 'top songs', 'all songs', 'hits collection',
+    'back to back', 'back2back', 'audio jukebox', 'video jukebox',
+    'evergreen', 'all time', 'superhit songs', 'superhits',
+  ];
+
+  /** Pipe "|" in a title is the #1 indicator of a jukebox/compilation — filter those out */
+  private filterSongs(tracks: UnifiedTrack[]): UnifiedTrack[] {
+    return tracks
+      .filter(t => !(t.title || '').includes('|'))
+      .filter(t => {
+        const title = (t.title || '').toLowerCase();
+        return !this.SONG_JUNK_KEYWORDS.some(kw => title.includes(kw));
+      })
+      .filter(t => !t.durationMs || t.durationMs < 600_000);
+  }
 
   greeting = signal(this.computeGreeting());
   private greetingTimer: any;
@@ -824,7 +842,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.loadingLanguage = true;
     this.apiService.search(lang.query, 'youtube').subscribe({
       next: (res) => {
-        this.youtubeTrending = res.youTubeResults;
+        this.youtubeTrending = this.filterSongs(res.youTubeResults);
         this.loadingLanguage = false;
       },
       error: () => { this.loadingLanguage = false; }
