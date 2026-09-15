@@ -838,13 +838,19 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (this.activeLanguage?.code === lang.code) return;
     this.activeLanguage = lang;
     this.loadingLanguage = true;
-    // months=18: rolling 18-month window from today — always current, no hardcoded year
-    this.apiService.getYouTubeTrendingLanguage(lang.query, 18).subscribe({
+    // AI identifies trending songs → fetched from YouTube individually for accurate results
+    this.apiService.getYouTubeAITrendingLanguage(lang.label).subscribe({
       next: (tracks) => {
         this.youtubeTrending = this.filterSongs(tracks);
         this.loadingLanguage = false;
       },
-      error: () => { this.loadingLanguage = false; }
+      error: () => {
+        // Fallback: regular trending search if AI endpoint fails
+        this.apiService.getYouTubeTrendingLanguage(lang.query, 18).subscribe({
+          next: (tracks) => { this.youtubeTrending = this.filterSongs(tracks); this.loadingLanguage = false; },
+          error: () => { this.loadingLanguage = false; }
+        });
+      }
     });
   }
 

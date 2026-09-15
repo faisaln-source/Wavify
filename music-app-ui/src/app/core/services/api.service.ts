@@ -48,6 +48,13 @@ export class ApiService {
     );
   }
 
+  /** AI-powered: Groq identifies trending songs for a language, then fetches from YouTube */
+  getYouTubeAITrendingLanguage(language: string): Observable<UnifiedTrack[]> {
+    return this.http.get<UnifiedTrack[]>(
+      `${this.baseUrl}/youtube/ai-trending-language?language=${encodeURIComponent(language)}`
+    );
+  }
+
   /** Search Spotify tracks by mood/genre query string */
   async searchSpotifyByMood(query: string, token?: string): Promise<UnifiedTrack[]> {
     let headers = new HttpHeaders();

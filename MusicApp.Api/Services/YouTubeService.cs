@@ -8,12 +8,126 @@ public class YouTubeService
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _config;
+    private readonly IHttpClientFactory _clientFactory;
 
-    public YouTubeService(HttpClient httpClient, IConfiguration config)
+    public YouTubeService(HttpClient httpClient, IConfiguration config, IHttpClientFactory clientFactory)
     {
         _httpClient = httpClient;
         _config = config;
+        _clientFactory = clientFactory;
         _httpClient.BaseAddress = new Uri("https://www.googleapis.com/youtube/v3/");
+    }
+
+    /// <summary>
+    /// Uses Groq AI to get the top 10 currently trending songs for a language,
+    /// then fetches each from YouTube for accurate video IDs and thumbnails.
+    /// </summary>
+    public async Task<List<UnifiedTrack>> GetAITrendingLanguageAsync(string language)
+    {
+        var groqKey = _config["Groq:ApiKey"];
+        var ytKey = _config["YouTube:ApiKey"];
+
+        // Step 1: Ask Groq for the top trending songs
+        List<string> songQueries = new();
+        if (!string.IsNullOrEmpty(groqKey))
+        {
+            try
+            {
+                var groqClient = _clientFactory.CreateClient();
+                groqClient.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", groqKey);
+
+                var prompt = $"""
+                    List the top 10 most trending and popular {language} songs RIGHT NOW in 2025-2026.
+                    Return ONLY a JSON array of strings in this exact format, nothing else:
+                    ["Song Name - Artist Name", "Song Name - Artist Name", ...]
+                    Focus on recent viral hits, chart-toppers, and songs with millions of views.
+                    Do NOT include old songs from before 2024. Do NOT add explanations.
+                    """;
+
+                var payload = new
+                {
+                    model = "llama-3.1-8b-instant",
+                    messages = new[]
+                    {
+                        new { role = "user", content = prompt }
+                    },
+                    temperature = 0.3,
+                    max_tokens = 512
+                };
+
+                var resp = await groqClient.PostAsJsonAsync("https://api.groq.com/openai/v1/chat/completions", payload);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+                    var raw = json.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "[]";
+
+                    // Extract JSON array from response (handle markdown code fences)
+                    var match = Regex.Match(raw, @"\[.*?\]", RegexOptions.Singleline);
+                    if (match.Success)
+                    {
+                        songQueries = JsonSerializer.Deserialize<List<string>>(match.Value) ?? new();
+                    }
+                }
+            }
+            catch { /* Fall through to YouTube search fallback */ }
+        }
+
+        // Step 2: If AI gave us songs, search each on YouTube
+        if (songQueries.Count > 0 && !string.IsNullOrEmpty(ytKey))
+        {
+            var tracks = new List<UnifiedTrack>();
+            var fetchTasks = songQueries.Take(10).Select(q => FetchFirstYouTubeResult(q, ytKey));
+            var results = await Task.WhenAll(fetchTasks);
+            tracks.AddRange(results.Where(t => t != null)!);
+            if (tracks.Count > 0) return tracks;
+        }
+
+        // Step 3: Fallback to regular trending-language search
+        return await SearchTrendingLanguageAsync($"{language} song", 18);
+    }
+
+    private async Task<UnifiedTrack?> FetchFirstYouTubeResult(string query, string apiKey)
+    {
+        try
+        {
+            var url = $"search?part=snippet&q={Uri.EscapeDataString(query)}&type=video&videoCategoryId=10&maxResults=1&key={apiKey}";
+            var response = await _httpClient.GetAsync(url);
+            if (!response.IsSuccessStatusCode) return null;
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            var items = doc.RootElement.GetProperty("items");
+            if (!items.EnumerateArray().Any()) return null;
+
+            var item = items[0];
+            var snippet = item.GetProperty("snippet");
+            var videoId = item.GetProperty("id").GetProperty("videoId").GetString() ?? "";
+            var thumbnails = snippet.GetProperty("thumbnails");
+            var thumbnail = thumbnails.TryGetProperty("high", out var h)
+                ? h.GetProperty("url").GetString() ?? ""
+                : thumbnails.GetProperty("default").GetProperty("url").GetString() ?? "";
+
+            var publishedAt = snippet.TryGetProperty("publishedAt", out var pub) ? pub.GetString() ?? "" : "";
+
+            // Enrich with duration
+            var track = new UnifiedTrack
+            {
+                Id = videoId,
+                Title = snippet.GetProperty("title").GetString() ?? query,
+                Artist = snippet.GetProperty("channelTitle").GetString() ?? "",
+                Album = publishedAt,
+                ThumbnailUrl = thumbnail,
+                DurationMs = 0,
+                Source = "youtube",
+                SourceUri = videoId,
+                PreviewUrl = ""
+            };
+
+            await EnrichWithDurations(new List<UnifiedTrack> { track }, new List<string> { videoId }, apiKey);
+            return track;
+        }
+        catch { return null; }
     }
 
     public async Task<List<UnifiedTrack>> SearchAsync(string query)

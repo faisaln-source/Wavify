@@ -22,6 +22,20 @@ public class YouTubeController : ControllerBase
     }
 
     /// <summary>
+    /// Uses Groq AI to identify trending songs for a language, then fetches them from YouTube.
+    /// Falls back to viewCount search if AI is unavailable.
+    /// </summary>
+    [HttpGet("ai-trending-language")]
+    public async Task<IActionResult> GetAITrendingLanguage([FromQuery] string language)
+    {
+        if (string.IsNullOrWhiteSpace(language))
+            return BadRequest("Query parameter 'language' is required");
+
+        var results = await _youtubeService.GetAITrendingLanguageAsync(language);
+        return Ok(results);
+    }
+
+    /// <summary>
     /// Returns recent music sorted by view count.
     /// months = how far back to look (default 18, so always slides with today's date).
     /// </summary>
