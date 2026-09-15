@@ -588,18 +588,28 @@ import { FavoritesService } from '../../core/services/favorites.service';
         align-items: center;
         padding: 0 12px;
         gap: 10px;
+        overflow: hidden; /* prevent long titles from escaping */
       }
 
       /* Hide desktop-only sections */
       .player-center { display: none; }
       .player-right { display: none; }
 
-      /* Track info takes all remaining space */
+      /* Track info: flex-1 but MUST NOT grow beyond available space */
       .track-info {
-        flex: 1;
-        gap: 10px;
+        flex: 1 1 0;       /* grow, shrink, basis 0 — never overflows */
         min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        gap: 10px;
         animation: none;
+      }
+
+      /* track-details must also clip so ellipsis works on the title */
+      .track-details {
+        min-width: 0;
+        overflow: hidden;
+        width: 100%;
       }
 
       .album-art { width: 44px; height: 44px; border-radius: 6px; flex-shrink: 0; }
@@ -608,6 +618,7 @@ import { FavoritesService } from '../../core/services/favorites.service';
       .track-title { font-size: 13px; }
       .track-artist { font-size: 11px; }
       .source-dot, .badge { display: none; }
+
 
       /* Compact mobile controls (prev / play-pause / next) */
       .mobile-controls {
