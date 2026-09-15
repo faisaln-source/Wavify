@@ -4,12 +4,13 @@ import { SidebarComponent } from './shared/sidebar/sidebar.component';
 import { PlayerBarComponent } from './shared/player-bar/player-bar.component';
 import { QueuePanelComponent } from './shared/queue-panel/queue-panel.component';
 import { ChatPanelComponent } from './shared/chat-panel/chat-panel.component';
+import { NowPlayingModalComponent } from './shared/now-playing-modal/now-playing-modal.component';
 import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, SidebarComponent, PlayerBarComponent, QueuePanelComponent, ChatPanelComponent, CommonModule, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, SidebarComponent, PlayerBarComponent, QueuePanelComponent, ChatPanelComponent, NowPlayingModalComponent, CommonModule, RouterLink, RouterLinkActive],
   template: `
     <div class="app-shell" [class.sidebar-open]="sidebarOpen()">
       <!-- Mobile: top header bar -->
@@ -43,6 +44,7 @@ import { CommonModule } from '@angular/common';
       <app-queue-panel></app-queue-panel>
       <app-player-bar class="player-wrapper"></app-player-bar>
       <app-chat-panel></app-chat-panel>
+      <app-now-playing-modal></app-now-playing-modal>
 
       <!-- Mobile bottom nav -->
       <nav class="mobile-bottom-nav">

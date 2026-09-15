@@ -29,6 +29,14 @@ export class PlayerService {
   queueOpenRequest$ = this.queueOpenSubject.asObservable();
   requestQueueOpen() { this.queueOpenSubject.next(); }
 
+  /** Now Playing full-screen modal */
+  private nowPlayingSubject = new BehaviorSubject<boolean>(false);
+  nowPlaying$ = this.nowPlayingSubject.asObservable();
+  openNowPlaying()  { this.nowPlayingSubject.next(true);  }
+  closeNowPlaying() { this.nowPlayingSubject.next(false); }
+  toggleNowPlaying() { this.nowPlayingSubject.next(!this.nowPlayingSubject.value); }
+
+
   private audioElement: HTMLAudioElement | null = null;
   private youtubePlayer: any = null;
   private spotifySdkPlayer: any = null;

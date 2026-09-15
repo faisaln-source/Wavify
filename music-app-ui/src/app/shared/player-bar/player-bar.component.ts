@@ -12,7 +12,8 @@ import { FavoritesService } from '../../core/services/favorites.service';
       <!-- Ambient glow background -->
       <div class="ambient-glow" [class.active]="(playerService.isPlaying$ | async)"></div>
 
-      <div class="track-info">
+      <!-- Track info — tappable on mobile to open full Now Playing view -->
+      <div class="track-info" (click)="playerService.openNowPlaying()" style="cursor:pointer">
         <div class="album-art" [class.spinning]="(playerService.isPlaying$ | async)">
           <div class="vinyl-ring"></div>
           <img [src]="track.thumbnailUrl" [alt]="track.title" />
