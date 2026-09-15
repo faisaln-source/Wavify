@@ -511,6 +511,14 @@ export class NowPlayingModalComponent implements OnDestroy {
   loadingSimilar = false;
   private trackSub: Subscription;
 
+  // Keywords that indicate a playlist/compilation — not individual songs
+  private readonly JUNK_KEYWORDS = [
+    'playlist', 'mix', 'compilation', 'mashup', 'nonstop', 'non stop',
+    'full album', 'jukebox', 'best of', 'top songs', 'top tracks',
+    'all songs', 'hits collection', 'audio jukebox', 'video jukebox',
+    'back to back', 'back2back'
+  ];
+
   constructor(
     public playerService: PlayerService,
     public favorites: FavoritesService,
@@ -521,19 +529,30 @@ export class NowPlayingModalComponent implements OnDestroy {
       switchMap(track => {
         if (!track) { this.similarTracks = []; return of(null); }
         this.loadingSimilar = true;
-        const q = `${track.title} ${track.artist}`;
+        // Query: artist's recent/new songs — avoids pulling in the exact same track or playlists
+        const artist = track.artist.split(/[,&]/)[0].trim(); // first artist if multiple
+        const q = `${artist} new songs 2024 official`;
         return this.apiService.search(q, 'youtube');
       })
     ).subscribe({
       next: (res) => {
         if (res) {
           const currentId = this.playerService.currentTrackSnapshot?.id;
-          this.similarTracks = res.youTubeResults.filter((t: UnifiedTrack) => t.id !== currentId).slice(0, 10);
+          this.similarTracks = res.youTubeResults
+            .filter((t: UnifiedTrack) => t.id !== currentId)
+            .filter((t: UnifiedTrack) => !this.isJunk(t))
+            .filter((t: UnifiedTrack) => !t.durationMs || t.durationMs < 600_000) // skip >10 min
+            .slice(0, 10);
         }
         this.loadingSimilar = false;
       },
       error: () => { this.loadingSimilar = false; }
     });
+  }
+
+  private isJunk(track: UnifiedTrack): boolean {
+    const title = (track.title || '').toLowerCase();
+    return this.JUNK_KEYWORDS.some(kw => title.includes(kw));
   }
 
   ngOnDestroy() { this.trackSub?.unsubscribe(); }
