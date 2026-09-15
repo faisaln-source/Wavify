@@ -714,21 +714,19 @@ export class HomeComponent implements OnInit, OnDestroy {
   loadingLanguage = false;
 
   private readonly SONG_JUNK_KEYWORDS = [
-    'jukebox', 'playlist', 'nonstop', 'non stop', 'compilation', 'mashup',
-    'full album', 'best of', 'top songs', 'all songs', 'hits collection',
-    'back to back', 'back2back', 'audio jukebox', 'video jukebox',
-    'evergreen', 'all time', 'superhit songs', 'superhits',
+    'jukebox', 'nonstop', 'non stop', 'full album',
+    'audio jukebox', 'video jukebox', 'back to back', 'back2back',
   ];
 
-  /** Pipe "|" in a title is the #1 indicator of a jukebox/compilation — filter those out */
+  /** Filter clear compilations — only pipe when 3+ segments (true jukeboxes have many artists listed) */
   private filterSongs(tracks: UnifiedTrack[]): UnifiedTrack[] {
     return tracks
-      .filter(t => !(t.title || '').includes('|'))
+      .filter(t => (t.title?.split('|').length ?? 0) <= 3) // 4+ pipe segments = compilation
       .filter(t => {
         const title = (t.title || '').toLowerCase();
         return !this.SONG_JUNK_KEYWORDS.some(kw => title.includes(kw));
       })
-      .filter(t => !t.durationMs || t.durationMs < 600_000);
+      .filter(t => !t.durationMs || t.durationMs < 900_000); // skip >15 min
   }
 
   greeting = signal(this.computeGreeting());
