@@ -305,8 +305,16 @@ export class PlayerService {
   // ─── Public Playback API ───────────────────────────────────────────────────
 
   play(track: UnifiedTrack, playlist?: UnifiedTrack[]) {
-    if (playlist) this.queueSubject.next(playlist);
+    if (playlist && playlist.length > 0) {
+      // Caller supplied a full playlist — use it as the queue
+      this.queueSubject.next(playlist);
+    } else if (this.queueSubject.value.length === 0) {
+      // No existing queue — seed with just this track so next/prev don't crash
+      this.queueSubject.next([track]);
+    }
+    // If queue already has tracks and no new playlist given, keep the existing queue
     this.currentTrackSubject.next(track);
+
     this.progressSubject.next(0);
 
     // Persist to recently played history
