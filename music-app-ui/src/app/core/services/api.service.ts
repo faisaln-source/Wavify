@@ -41,10 +41,10 @@ export class ApiService {
     return this.http.get<UnifiedTrack[]>(`${this.baseUrl}/youtube/trending?region=${region}`);
   }
 
-  /** Fetch recent (last 6 months) music sorted by view count for a language/query */
-  getYouTubeTrendingLanguage(query: string): Observable<UnifiedTrack[]> {
+  /** Fetch recent music sorted by view count. months = rolling window from today (default 18) */
+  getYouTubeTrendingLanguage(query: string, months: number = 18): Observable<UnifiedTrack[]> {
     return this.http.get<UnifiedTrack[]>(
-      `${this.baseUrl}/youtube/trending-language?q=${encodeURIComponent(query)}`
+      `${this.baseUrl}/youtube/trending-language?q=${encodeURIComponent(query)}&months=${months}`
     );
   }
 

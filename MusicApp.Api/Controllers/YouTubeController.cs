@@ -22,15 +22,17 @@ public class YouTubeController : ControllerBase
     }
 
     /// <summary>
-    /// Returns recent (last 6 months) music for a language/query, sorted by view count.
+    /// Returns recent music sorted by view count.
+    /// months = how far back to look (default 18, so always slides with today's date).
     /// </summary>
     [HttpGet("trending-language")]
-    public async Task<IActionResult> GetTrendingLanguage([FromQuery] string q)
+    public async Task<IActionResult> GetTrendingLanguage([FromQuery] string q, [FromQuery] int months = 18)
     {
         if (string.IsNullOrWhiteSpace(q))
             return BadRequest("Query parameter 'q' is required");
 
-        var results = await _youtubeService.SearchTrendingLanguageAsync(q);
+        months = Math.Clamp(months, 1, 60); // safety clamp
+        var results = await _youtubeService.SearchTrendingLanguageAsync(q, months);
         return Ok(results);
     }
 

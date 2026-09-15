@@ -66,23 +66,23 @@ public class YouTubeService
     }
 
     /// <summary>
-    /// Search for trending language-specific music ordered by view count,
-    /// published within the last 6 months — gives recent + popular results.
+    /// Search for trending language-specific music ordered by view count.
+    /// publishedAfter is dynamic: 'months' months ago from now (default 18).
     /// </summary>
-    public async Task<List<UnifiedTrack>> SearchTrendingLanguageAsync(string query)
+    public async Task<List<UnifiedTrack>> SearchTrendingLanguageAsync(string query, int months = 18)
     {
         var apiKey = _config["YouTube:ApiKey"];
         if (string.IsNullOrEmpty(apiKey))
             return GetDemoResults(query);
 
-        // publishedAfter = 6 months ago in RFC3339 format
-        var publishedAfter = DateTime.UtcNow.AddMonths(-6).ToString("yyyy-MM-ddTHH:mm:ssZ");
+        // Dynamic: N months ago so the window always slides with today's date
+        var publishedAfter = DateTime.UtcNow.AddMonths(-months).ToString("yyyy-MM-ddTHH:mm:ssZ");
 
         var url = $"search?part=snippet" +
                   $"&q={Uri.EscapeDataString(query)}" +
                   $"&type=video" +
-                  $"&videoCategoryId=10" +       // Music category
-                  $"&order=viewCount" +           // Most viewed first
+                  $"&videoCategoryId=10" +
+                  $"&order=viewCount" +
                   $"&publishedAfter={Uri.EscapeDataString(publishedAfter)}" +
                   $"&maxResults=25" +
                   $"&key={apiKey}";
@@ -107,7 +107,6 @@ public class YouTubeService
                 ? highThumb.GetProperty("url").GetString() ?? ""
                 : thumbnails.GetProperty("default").GetProperty("url").GetString() ?? "";
 
-            // Grab publish date for display
             var publishedAt = snippet.TryGetProperty("publishedAt", out var pub)
                 ? pub.GetString() ?? ""
                 : "";
@@ -118,7 +117,7 @@ public class YouTubeService
                 Id = videoId,
                 Title = snippet.GetProperty("title").GetString() ?? "",
                 Artist = snippet.GetProperty("channelTitle").GetString() ?? "",
-                Album = publishedAt, // reuse Album field to carry publish date to frontend
+                Album = publishedAt,
                 ThumbnailUrl = thumbnail,
                 DurationMs = 0,
                 Source = "youtube",

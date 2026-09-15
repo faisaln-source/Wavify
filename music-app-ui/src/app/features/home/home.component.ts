@@ -701,14 +701,14 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   // ── India language filter ──
   indianLanguages = [
-    { code: 'hindi',     label: 'Hindi',     flag: '🎵', query: 'Hindi song 2024 2025' },
-    { code: 'tamil',     label: 'Tamil',     flag: '🎶', query: 'Tamil song kollywood 2024' },
-    { code: 'telugu',    label: 'Telugu',    flag: '🎼', query: 'Telugu song tollywood 2024' },
-    { code: 'kannada',   label: 'Kannada',   flag: '🎹', query: 'Kannada song sandalwood 2024' },
-    { code: 'punjabi',   label: 'Punjabi',   flag: '🥁', query: 'Punjabi song 2024 2025' },
-    { code: 'malayalam', label: 'Malayalam', flag: '🪗', query: 'Malayalam song mollywood 2024' },
-    { code: 'bengali',   label: 'Bengali',   flag: '🎷', query: 'Bengali song 2024 2025' },
-    { code: 'bhojpuri',  label: 'Bhojpuri',  flag: '🎺', query: 'Bhojpuri song 2024 2025' },
+    { code: 'hindi',     label: 'Hindi',     flag: '🎵', query: 'Hindi song' },
+    { code: 'tamil',     label: 'Tamil',     flag: '🎶', query: 'Tamil song kollywood' },
+    { code: 'telugu',    label: 'Telugu',    flag: '🎼', query: 'Telugu song tollywood' },
+    { code: 'kannada',   label: 'Kannada',   flag: '🎹', query: 'Kannada song sandalwood' },
+    { code: 'punjabi',   label: 'Punjabi',   flag: '🥁', query: 'Punjabi song' },
+    { code: 'malayalam', label: 'Malayalam', flag: '🪗', query: 'Malayalam song mollywood' },
+    { code: 'bengali',   label: 'Bengali',   flag: '🎷', query: 'Bengali song' },
+    { code: 'bhojpuri',  label: 'Bhojpuri',  flag: '🎺', query: 'Bhojpuri song' },
   ];
   activeLanguage: typeof this.indianLanguages[0] | null = null;
   loadingLanguage = false;
@@ -838,8 +838,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (this.activeLanguage?.code === lang.code) return;
     this.activeLanguage = lang;
     this.loadingLanguage = true;
-    // Use trending-language endpoint: order=viewCount + publishedAfter 6 months
-    this.apiService.getYouTubeTrendingLanguage(lang.query).subscribe({
+    // months=18: rolling 18-month window from today — always current, no hardcoded year
+    this.apiService.getYouTubeTrendingLanguage(lang.query, 18).subscribe({
       next: (tracks) => {
         this.youtubeTrending = this.filterSongs(tracks);
         this.loadingLanguage = false;
