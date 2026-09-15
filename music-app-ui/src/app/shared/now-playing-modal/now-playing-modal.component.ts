@@ -71,7 +71,9 @@ import { FavoritesService } from '../../core/services/favorites.service';
           <!-- Progress -->
           <div class="np-progress-section">
             <div class="np-progress-track"
-                 (click)="onProgressClick($event)" id="np-progress-bar">
+                 (mousedown)="onProgressDragStart($event)"
+                 (touchstart)="onProgressTouchStart($event)"
+                 id="np-progress-bar">
               <div class="np-progress-fill"
                    [style.width.%]="playerService.progress$ | async"></div>
               <div class="np-progress-thumb"
@@ -148,7 +150,10 @@ import { FavoritesService } from '../../core/services/favorites.service';
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="np-vol-icon">
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
             </svg>
-            <div class="np-vol-track" (click)="onVolumeClick($event)" id="np-volume-bar">
+            <div class="np-vol-track"
+                 (mousedown)="onVolumeDragStart($event)"
+                 (touchstart)="onVolumeTouchStart($event)"
+                 id="np-volume-bar">
               <div class="np-vol-fill"
                    [style.width.%]="playerService.volume$ | async"></div>
               <div class="np-vol-thumb"
@@ -421,18 +426,50 @@ export class NowPlayingModalComponent {
   @HostListener('document:keydown.escape')
   close() { this.playerService.closeNowPlaying(); }
 
-  onProgressClick(event: MouseEvent) {
-    const bar = event.currentTarget as HTMLElement;
-    const rect = bar.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
-    this.playerService.seekTo(pct);
+  // ── Helpers ──────────────────────────────────────────
+  private pct(clientX: number, bar: HTMLElement): number {
+    const r = bar.getBoundingClientRect();
+    return Math.max(0, Math.min(100, ((clientX - r.left) / r.width) * 100));
   }
 
-  onVolumeClick(event: MouseEvent) {
-    const bar = event.currentTarget as HTMLElement;
-    const rect = bar.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
-    this.playerService.setVolume(pct);
+  // ── Progress drag ─────────────────────────────────────
+  onProgressDragStart(e: MouseEvent) {
+    e.preventDefault();
+    const bar = e.currentTarget as HTMLElement;
+    this.playerService.seekTo(this.pct(e.clientX, bar));
+    const move = (ev: MouseEvent) => this.playerService.seekTo(this.pct(ev.clientX, bar));
+    const up   = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
+
+  onProgressTouchStart(e: TouchEvent) {
+    const bar = e.currentTarget as HTMLElement;
+    this.playerService.seekTo(this.pct(e.touches[0].clientX, bar));
+    const move = (ev: TouchEvent) => this.playerService.seekTo(this.pct(ev.touches[0].clientX, bar));
+    const end  = () => { document.removeEventListener('touchmove', move); document.removeEventListener('touchend', end); };
+    document.addEventListener('touchmove', move, { passive: true });
+    document.addEventListener('touchend', end);
+  }
+
+  // ── Volume drag ───────────────────────────────────────
+  onVolumeDragStart(e: MouseEvent) {
+    e.preventDefault();
+    const bar = e.currentTarget as HTMLElement;
+    this.playerService.setVolume(this.pct(e.clientX, bar));
+    const move = (ev: MouseEvent) => this.playerService.setVolume(this.pct(ev.clientX, bar));
+    const up   = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
+
+  onVolumeTouchStart(e: TouchEvent) {
+    const bar = e.currentTarget as HTMLElement;
+    this.playerService.setVolume(this.pct(e.touches[0].clientX, bar));
+    const move = (ev: TouchEvent) => this.playerService.setVolume(this.pct(ev.touches[0].clientX, bar));
+    const end  = () => { document.removeEventListener('touchmove', move); document.removeEventListener('touchend', end); };
+    document.addEventListener('touchmove', move, { passive: true });
+    document.addEventListener('touchend', end);
   }
 
   formatCurrent(): string {

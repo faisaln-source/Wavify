@@ -78,7 +78,10 @@ import { FavoritesService } from '../../core/services/favorites.service';
 
         <div class="progress-section">
           <span class="time-display">{{ formatProgress() }}</span>
-          <div class="progress-track" (click)="onProgressClick($event)" id="progress-bar">
+          <div class="progress-track"
+               (mousedown)="onProgressDragStart($event)"
+               (touchstart)="onProgressTouchStart($event)"
+               id="progress-bar">
             <div class="progress-fill" [style.width.%]="(playerService.progress$ | async) || 0">
               <div class="progress-glow"></div>
             </div>
@@ -109,7 +112,10 @@ import { FavoritesService } from '../../core/services/favorites.service';
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" *ngIf="(playerService.volume$ | async)! > 0 && (playerService.volume$ | async)! <= 50"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" *ngIf="(playerService.volume$ | async)! === 0"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
           </button>
-          <div class="volume-track" (click)="onVolumeClick($event)" id="volume-bar">
+          <div class="volume-track"
+               (mousedown)="onVolumeDragStart($event)"
+               (touchstart)="onVolumeTouchStart($event)"
+               id="volume-bar">
             <div class="volume-fill" [style.width.%]="(playerService.volume$ | async) || 0"></div>
             <div class="volume-thumb" [style.left.%]="(playerService.volume$ | async) || 0"></div>
           </div>
@@ -662,18 +668,50 @@ export class PlayerBarComponent {
     this.favorites.toggle(track);
   }
 
-  onProgressClick(event: MouseEvent) {
-    const bar = event.currentTarget as HTMLElement;
-    const rect = bar.getBoundingClientRect();
-    const percent = ((event.clientX - rect.left) / rect.width) * 100;
-    this.playerService.seekTo(Math.max(0, Math.min(100, percent)));
+  // ── Helpers ──────────────────────────────────────────
+  private pct(clientX: number, bar: HTMLElement): number {
+    const r = bar.getBoundingClientRect();
+    return Math.max(0, Math.min(100, ((clientX - r.left) / r.width) * 100));
   }
 
-  onVolumeClick(event: MouseEvent) {
-    const bar = event.currentTarget as HTMLElement;
-    const rect = bar.getBoundingClientRect();
-    const percent = ((event.clientX - rect.left) / rect.width) * 100;
-    this.playerService.setVolume(Math.max(0, Math.min(100, percent)));
+  // ── Progress drag ─────────────────────────────────────
+  onProgressDragStart(e: MouseEvent) {
+    e.preventDefault();
+    const bar = e.currentTarget as HTMLElement;
+    this.playerService.seekTo(this.pct(e.clientX, bar));
+    const move = (ev: MouseEvent) => this.playerService.seekTo(this.pct(ev.clientX, bar));
+    const up   = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
+
+  onProgressTouchStart(e: TouchEvent) {
+    const bar = e.currentTarget as HTMLElement;
+    this.playerService.seekTo(this.pct(e.touches[0].clientX, bar));
+    const move = (ev: TouchEvent) => this.playerService.seekTo(this.pct(ev.touches[0].clientX, bar));
+    const end  = () => { document.removeEventListener('touchmove', move); document.removeEventListener('touchend', end); };
+    document.addEventListener('touchmove', move, { passive: true });
+    document.addEventListener('touchend', end);
+  }
+
+  // ── Volume drag ───────────────────────────────────────
+  onVolumeDragStart(e: MouseEvent) {
+    e.preventDefault();
+    const bar = e.currentTarget as HTMLElement;
+    this.playerService.setVolume(this.pct(e.clientX, bar));
+    const move = (ev: MouseEvent) => this.playerService.setVolume(this.pct(ev.clientX, bar));
+    const up   = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
+
+  onVolumeTouchStart(e: TouchEvent) {
+    const bar = e.currentTarget as HTMLElement;
+    this.playerService.setVolume(this.pct(e.touches[0].clientX, bar));
+    const move = (ev: TouchEvent) => this.playerService.setVolume(this.pct(ev.touches[0].clientX, bar));
+    const end  = () => { document.removeEventListener('touchmove', move); document.removeEventListener('touchend', end); };
+    document.addEventListener('touchmove', move, { passive: true });
+    document.addEventListener('touchend', end);
   }
 
   toggleMute() {
