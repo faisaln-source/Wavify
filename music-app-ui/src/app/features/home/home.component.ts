@@ -188,6 +188,7 @@ interface TrendingRegion {
       padding-bottom: 120px;
       height: 100%;
       overflow-y: auto;
+      overflow-x: hidden;
     }
 
     .page-header { margin-bottom: 20px; }
@@ -417,6 +418,8 @@ interface TrendingRegion {
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
       animation: fadeIn 0.5s ease forwards;
+      overflow: hidden;
+      min-width: 0;
     }
 
     .panel-header {
@@ -446,7 +449,7 @@ interface TrendingRegion {
     .region-btn.active { background: rgba(255,0,0,0.1); color: #ff4444; border-color: rgba(255,68,68,0.4); }
     .region-flag { margin-right: 2px; }
 
-    .panel-tracks { padding: 4px 6px 10px; }
+    .panel-tracks { padding: 4px 6px 10px; overflow: hidden; }
 
     .empty-state { padding: 40px; text-align: center; color: var(--text-tertiary); font-size: 14px; }
 

@@ -80,6 +80,7 @@ import { LocalPlaylist } from '../../core/models/track.model';
       cursor: pointer; transition: all var(--transition-fast);
       animation: fadeIn 0.3s ease forwards;
       position: relative;
+      width: 100%; max-width: 100%; box-sizing: border-box;
     }
     .track-card:hover { background: var(--bg-card-hover); transform: translateX(4px); }
     .track-card.active { background: rgba(167,139,250,0.08); border-left: 3px solid var(--accent-primary); }
@@ -200,6 +201,7 @@ import { LocalPlaylist } from '../../core/models/track.model';
       .track-duration { display: none; }
       .playlist-add-wrap { display: none; }
       .like-btn { display: none; }
+      .track-number { display: none; }
       /* Make track-meta text clamp properly */
       .track-meta { min-width: 0; overflow: hidden; }
       .track-thumb { width: 42px; height: 42px; }
@@ -213,6 +215,8 @@ export class TrackCardComponent {
 
   @HostBinding('style.display') display = 'block';
   @HostBinding('style.position') position = 'relative';
+  @HostBinding('style.maxWidth') maxWidth = '100%';
+  @HostBinding('style.overflow') hostOverflow = 'hidden';
   @HostBinding('style.zIndex') get zIndex() {
     return this.dropdownOpen ? 1000 : 1;
   }
