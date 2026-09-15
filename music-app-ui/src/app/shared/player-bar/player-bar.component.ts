@@ -613,12 +613,28 @@ import { FavoritesService } from '../../core/services/favorites.service';
       .mobile-controls {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 4px;
         flex-shrink: 0;
       }
 
-      .play-pause-btn { width: 40px; height: 40px; }
-      .play-pause-btn svg { width: 18px; height: 18px; }
+      /* Override the default dim color for mobile ctrl buttons */
+      .mobile-controls .ctrl-btn {
+        width: 40px;
+        height: 40px;
+        color: var(--text-primary);
+      }
+      .mobile-controls .ctrl-btn svg {
+        width: 22px;
+        height: 22px;
+      }
+      .mobile-controls .ctrl-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: white;
+        transform: none;
+      }
+
+      .play-pause-btn { width: 42px; height: 42px; }
+      .play-pause-btn svg { width: 20px; height: 20px; }
     }
   `]
 })

@@ -314,8 +314,8 @@ export class PlayerService {
     }
     // If queue already has tracks and no new playlist given, keep the existing queue
     this.currentTrackSubject.next(track);
-
     this.progressSubject.next(0);
+    this.isContextPlaying = false; // reset — this track is not a Spotify context play
 
     // Persist to recently played history
     this.recentlyPlayed.addTrack(track);
