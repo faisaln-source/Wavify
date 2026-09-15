@@ -65,6 +65,72 @@ public class YouTubeService
         return tracks;
     }
 
+    /// <summary>
+    /// Search for trending language-specific music ordered by view count,
+    /// published within the last 6 months — gives recent + popular results.
+    /// </summary>
+    public async Task<List<UnifiedTrack>> SearchTrendingLanguageAsync(string query)
+    {
+        var apiKey = _config["YouTube:ApiKey"];
+        if (string.IsNullOrEmpty(apiKey))
+            return GetDemoResults(query);
+
+        // publishedAfter = 6 months ago in RFC3339 format
+        var publishedAfter = DateTime.UtcNow.AddMonths(-6).ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+        var url = $"search?part=snippet" +
+                  $"&q={Uri.EscapeDataString(query)}" +
+                  $"&type=video" +
+                  $"&videoCategoryId=10" +       // Music category
+                  $"&order=viewCount" +           // Most viewed first
+                  $"&publishedAfter={Uri.EscapeDataString(publishedAfter)}" +
+                  $"&maxResults=25" +
+                  $"&key={apiKey}";
+
+        var response = await _httpClient.GetAsync(url);
+        if (!response.IsSuccessStatusCode)
+            return GetDemoResults(query);
+
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+
+        var tracks = new List<UnifiedTrack>();
+        var videoIds = new List<string>();
+        var items = doc.RootElement.GetProperty("items");
+
+        foreach (var item in items.EnumerateArray())
+        {
+            var snippet = item.GetProperty("snippet");
+            var videoId = item.GetProperty("id").GetProperty("videoId").GetString() ?? "";
+            var thumbnails = snippet.GetProperty("thumbnails");
+            var thumbnail = thumbnails.TryGetProperty("high", out var highThumb)
+                ? highThumb.GetProperty("url").GetString() ?? ""
+                : thumbnails.GetProperty("default").GetProperty("url").GetString() ?? "";
+
+            // Grab publish date for display
+            var publishedAt = snippet.TryGetProperty("publishedAt", out var pub)
+                ? pub.GetString() ?? ""
+                : "";
+
+            videoIds.Add(videoId);
+            tracks.Add(new UnifiedTrack
+            {
+                Id = videoId,
+                Title = snippet.GetProperty("title").GetString() ?? "",
+                Artist = snippet.GetProperty("channelTitle").GetString() ?? "",
+                Album = publishedAt, // reuse Album field to carry publish date to frontend
+                ThumbnailUrl = thumbnail,
+                DurationMs = 0,
+                Source = "youtube",
+                SourceUri = videoId,
+                PreviewUrl = ""
+            });
+        }
+
+        await EnrichWithDurations(tracks, videoIds, apiKey);
+        return tracks;
+    }
+
     public async Task<List<UnifiedTrack>> GetTrendingMusicAsync(string regionCode = "US")
     {
         var apiKey = _config["YouTube:ApiKey"];

@@ -41,6 +41,13 @@ export class ApiService {
     return this.http.get<UnifiedTrack[]>(`${this.baseUrl}/youtube/trending?region=${region}`);
   }
 
+  /** Fetch recent (last 6 months) music sorted by view count for a language/query */
+  getYouTubeTrendingLanguage(query: string): Observable<UnifiedTrack[]> {
+    return this.http.get<UnifiedTrack[]>(
+      `${this.baseUrl}/youtube/trending-language?q=${encodeURIComponent(query)}`
+    );
+  }
+
   /** Search Spotify tracks by mood/genre query string */
   async searchSpotifyByMood(query: string, token?: string): Promise<UnifiedTrack[]> {
     let headers = new HttpHeaders();

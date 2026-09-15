@@ -21,6 +21,19 @@ public class YouTubeController : ControllerBase
         return Ok(trending);
     }
 
+    /// <summary>
+    /// Returns recent (last 6 months) music for a language/query, sorted by view count.
+    /// </summary>
+    [HttpGet("trending-language")]
+    public async Task<IActionResult> GetTrendingLanguage([FromQuery] string q)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+            return BadRequest("Query parameter 'q' is required");
+
+        var results = await _youtubeService.SearchTrendingLanguageAsync(q);
+        return Ok(results);
+    }
+
     [HttpGet("search")]
     public async Task<IActionResult> Search([FromQuery] string q)
     {

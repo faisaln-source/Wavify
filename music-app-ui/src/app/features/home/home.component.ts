@@ -701,14 +701,14 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   // ── India language filter ──
   indianLanguages = [
-    { code: 'hindi',     label: 'Hindi',     flag: '🎵', query: 'new Hindi song 2024 official video' },
-    { code: 'tamil',     label: 'Tamil',     flag: '🎶', query: 'new Tamil song 2024 official video kollywood' },
-    { code: 'telugu',    label: 'Telugu',    flag: '🎼', query: 'new Telugu song 2024 official video tollywood' },
-    { code: 'kannada',   label: 'Kannada',   flag: '🎹', query: 'new Kannada song 2024 official video sandalwood' },
-    { code: 'punjabi',   label: 'Punjabi',   flag: '🥁', query: 'new Punjabi song 2024 official video' },
-    { code: 'malayalam', label: 'Malayalam', flag: '🪗', query: 'new Malayalam song 2024 official video mollywood' },
-    { code: 'bengali',   label: 'Bengali',   flag: '🎷', query: 'new Bengali song 2024 official video' },
-    { code: 'bhojpuri',  label: 'Bhojpuri',  flag: '🎺', query: 'new Bhojpuri song 2024 official video' },
+    { code: 'hindi',     label: 'Hindi',     flag: '🎵', query: 'Hindi song 2024 2025' },
+    { code: 'tamil',     label: 'Tamil',     flag: '🎶', query: 'Tamil song kollywood 2024' },
+    { code: 'telugu',    label: 'Telugu',    flag: '🎼', query: 'Telugu song tollywood 2024' },
+    { code: 'kannada',   label: 'Kannada',   flag: '🎹', query: 'Kannada song sandalwood 2024' },
+    { code: 'punjabi',   label: 'Punjabi',   flag: '🥁', query: 'Punjabi song 2024 2025' },
+    { code: 'malayalam', label: 'Malayalam', flag: '🪗', query: 'Malayalam song mollywood 2024' },
+    { code: 'bengali',   label: 'Bengali',   flag: '🎷', query: 'Bengali song 2024 2025' },
+    { code: 'bhojpuri',  label: 'Bhojpuri',  flag: '🎺', query: 'Bhojpuri song 2024 2025' },
   ];
   activeLanguage: typeof this.indianLanguages[0] | null = null;
   loadingLanguage = false;
@@ -838,9 +838,10 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (this.activeLanguage?.code === lang.code) return;
     this.activeLanguage = lang;
     this.loadingLanguage = true;
-    this.apiService.search(lang.query, 'youtube').subscribe({
-      next: (res) => {
-        this.youtubeTrending = this.filterSongs(res.youTubeResults);
+    // Use trending-language endpoint: order=viewCount + publishedAfter 6 months
+    this.apiService.getYouTubeTrendingLanguage(lang.query).subscribe({
+      next: (tracks) => {
+        this.youtubeTrending = this.filterSongs(tracks);
         this.loadingLanguage = false;
       },
       error: () => { this.loadingLanguage = false; }
