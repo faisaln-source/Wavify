@@ -229,22 +229,49 @@ interface TrendingRegion {
         <div class="panel" *ngIf="youtubeTrending.length">
           <div class="panel-header" style="flex-direction: column; align-items: flex-start; gap: 12px;">
             <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-              <h2>Trending Music <span class="badge badge-youtube">YouTube</span></h2>
+              <h2>
+                Trending Music
+                <span class="badge badge-youtube">YouTube</span>
+                <span class="lang-badge" *ngIf="activeLanguage">{{ activeLanguage.label }}</span>
+              </h2>
               <button class="show-more-btn" *ngIf="youtubeTrending.length > 10"
                       (click)="showAllYouTube = !showAllYouTube">
                 {{ showAllYouTube ? 'Show Less' : 'Show All (' + youtubeTrending.length + ')' }}
               </button>
             </div>
+
+            <!-- Region tabs -->
             <div class="region-selector">
-              <button *ngFor="let r of trendingRegions" 
-                      class="region-btn" 
+              <button *ngFor="let r of trendingRegions"
+                      class="region-btn"
                       [class.active]="activeRegion.code === r.code"
                       (click)="setRegion(r)">
                 <span class="region-flag">{{ r.flag }}</span> {{ r.label }}
               </button>
             </div>
+
+            <!-- India: language sub-tabs (shown only when India is selected) -->
+            <div class="lang-selector" *ngIf="activeRegion.code === 'IN'">
+              <button class="lang-btn"
+                      [class.active]="!activeLanguage"
+                      (click)="clearLanguage()"
+                      id="lang-all">🇮🇳 All</button>
+              <button *ngFor="let lang of indianLanguages"
+                      class="lang-btn"
+                      [class.active]="activeLanguage?.code === lang.code"
+                      (click)="setLanguage(lang)"
+                      [id]="'lang-' + lang.code">
+                {{ lang.flag }} {{ lang.label }}
+              </button>
+            </div>
+
+            <!-- Loading indicator for language fetch -->
+            <div class="loading-inline" *ngIf="loadingLanguage">
+              <div class="spinner-sm"></div>
+              <span>Loading {{ activeLanguage?.label }} music…</span>
+            </div>
           </div>
-          <div class="panel-tracks">
+          <div class="panel-tracks" *ngIf="!loadingLanguage">
             <app-track-card
               *ngFor="let track of (showAllYouTube ? youtubeTrending : youtubeTrending.slice(0, 20)); let i = index"
               [track]="track" [index]="i" [playlist]="youtubeTrending">
@@ -442,6 +469,34 @@ interface TrendingRegion {
       border-top-color: var(--accent-primary);
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
+    }
+
+    /* ── India language selector ── */
+    .lang-selector {
+      display: flex; gap: 6px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      padding-bottom: 4px; width: 100%;
+    }
+    .lang-selector::-webkit-scrollbar { display: none; }
+    .lang-btn {
+      display: flex; align-items: center; gap: 4px;
+      padding: 5px 12px; border-radius: 100px; white-space: nowrap;
+      font-size: 12px; font-weight: 600; flex-shrink: 0;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card); color: var(--text-secondary);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .lang-btn:hover { color: var(--text-primary); border-color: rgba(251,146,60,0.5); }
+    .lang-btn.active {
+      background: rgba(251,146,60,0.15);
+      border-color: rgba(251,146,60,0.6);
+      color: #fb923c;
+    }
+    .lang-badge {
+      font-size: 11px; font-weight: 700; padding: 2px 8px;
+      border-radius: 100px; background: rgba(251,146,60,0.15);
+      border: 1px solid rgba(251,146,60,0.4); color: #fb923c;
+      margin-left: 4px; vertical-align: middle;
     }
 
     /* Source Toggle */
@@ -644,6 +699,20 @@ export class HomeComponent implements OnInit, OnDestroy {
   ];
   activeRegion: TrendingRegion = this.trendingRegions[0];
 
+  // ── India language filter ──
+  indianLanguages = [
+    { code: 'hindi',     label: 'Hindi',     flag: '🎵', query: 'Hindi songs hits 2024' },
+    { code: 'tamil',     label: 'Tamil',     flag: '🎶', query: 'Tamil songs trending kollywood' },
+    { code: 'telugu',    label: 'Telugu',    flag: '🎼', query: 'Telugu songs tollywood hits' },
+    { code: 'kannada',   label: 'Kannada',   flag: '🎹', query: 'Kannada songs sandalwood new' },
+    { code: 'punjabi',   label: 'Punjabi',   flag: '🥁', query: 'Punjabi songs bhangra hits 2024' },
+    { code: 'malayalam', label: 'Malayalam', flag: '🪗', query: 'Malayalam songs mollywood hits' },
+    { code: 'bengali',   label: 'Bengali',   flag: '🎷', query: 'Bengali songs Bangla hits 2024' },
+    { code: 'bhojpuri',  label: 'Bhojpuri',  flag: '🎺', query: 'Bhojpuri songs new 2024' },
+  ];
+  activeLanguage: typeof this.indianLanguages[0] | null = null;
+  loadingLanguage = false;
+
   greeting = signal(this.computeGreeting());
   private greetingTimer: any;
 
@@ -739,12 +808,37 @@ export class HomeComponent implements OnInit, OnDestroy {
   setRegion(region: TrendingRegion) {
     if (this.activeRegion.code === region.code) return;
     this.activeRegion = region;
-    
+    this.activeLanguage = null; // clear language sub-filter when changing region
+
     this.loading = true;
     this.pendingRequests = 1;
     this.apiService.getYouTubeTrending(region.code).subscribe({
       next: (tracks) => { this.youtubeTrending = tracks; this.checkLoading(); },
       error: () => this.checkLoading()
+    });
+  }
+
+  setLanguage(lang: typeof this.indianLanguages[0]) {
+    if (this.activeLanguage?.code === lang.code) return;
+    this.activeLanguage = lang;
+    this.loadingLanguage = true;
+    this.apiService.search(lang.query, 'youtube').subscribe({
+      next: (res) => {
+        this.youtubeTrending = res.youTubeResults;
+        this.loadingLanguage = false;
+      },
+      error: () => { this.loadingLanguage = false; }
+    });
+  }
+
+  clearLanguage() {
+    if (!this.activeLanguage) return;
+    this.activeLanguage = null;
+    this.loadingLanguage = true;
+    this.pendingRequests = 1;
+    this.apiService.getYouTubeTrending('IN').subscribe({
+      next: (tracks) => { this.youtubeTrending = tracks; this.loadingLanguage = false; },
+      error: () => { this.loadingLanguage = false; }
     });
   }
 

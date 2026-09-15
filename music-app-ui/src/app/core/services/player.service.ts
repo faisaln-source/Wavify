@@ -24,6 +24,9 @@ export class PlayerService {
   repeat$ = this.repeatSubject.asObservable();
   spotifyReady$ = this.spotifyReadySubject.asObservable();
 
+  /** Synchronous snapshot of the current track — use in one-off reads without subscribing */
+  get currentTrackSnapshot(): UnifiedTrack | null { return this.currentTrackSubject.value; }
+
   /** Emits whenever a playlist Play button is clicked — QueuePanelComponent subscribes to auto-open */
   private queueOpenSubject = new Subject<void>();
   queueOpenRequest$ = this.queueOpenSubject.asObservable();

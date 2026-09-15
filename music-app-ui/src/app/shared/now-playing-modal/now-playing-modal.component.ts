@@ -1,7 +1,10 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, HostListener, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PlayerService } from '../../core/services/player.service';
 import { FavoritesService } from '../../core/services/favorites.service';
+import { ApiService } from '../../core/services/api.service';
+import { UnifiedTrack } from '../../core/models/track.model';
+import { Subscription, switchMap, of } from 'rxjs';
 
 @Component({
   selector: 'app-now-playing-modal',
@@ -165,6 +168,35 @@ import { FavoritesService } from '../../core/services/favorites.service';
               <path d="M19.07 4.93a10 10 0 010 14.14"/>
             </svg>
           </div>
+
+          <!-- Similar Music -->
+          <div class="np-similar">
+            <div class="np-similar-header">
+              <span class="np-similar-title">Similar Music</span>
+              <div class="np-similar-spinner" *ngIf="loadingSimilar">
+                <div class="np-spin"></div>
+              </div>
+            </div>
+            <div class="np-similar-list" *ngIf="!loadingSimilar && similarTracks.length">
+              <div class="np-sim-card"
+                   *ngFor="let t of similarTracks; let i = index"
+                   (click)="playSimilar(t)"
+                   [class.active]="isCurrentTrack(t)">
+                <img class="np-sim-thumb" [src]="t.thumbnailUrl" [alt]="t.title" />
+                <div class="np-sim-info">
+                  <span class="np-sim-title">{{ t.title }}</span>
+                  <span class="np-sim-artist">{{ t.artist }}</span>
+                </div>
+                <div class="np-sim-play">
+                  <svg *ngIf="!isCurrentTrack(t)" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72a1 1 0 001.5.86l11-6.86a1 1 0 000-1.72l-11-6.86A1 1 0 008 5.14z"/></svg>
+                  <svg *ngIf="isCurrentTrack(t)" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                </div>
+              </div>
+            </div>
+            <div class="np-similar-empty" *ngIf="!loadingSimilar && !similarTracks.length">
+              No similar tracks found
+            </div>
+          </div>
         </ng-container>
 
         <!-- Empty state if no track -->
@@ -201,7 +233,7 @@ import { FavoritesService } from '../../core/services/favorites.service';
       height: 100dvh; /* full viewport height */
       z-index: 2000;
       display: flex; flex-direction: column; align-items: center;
-      overflow: hidden;
+      overflow-y: auto; overflow-x: hidden;
       transform: translateY(100%);
       transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
       will-change: transform;
@@ -413,18 +445,109 @@ import { FavoritesService } from '../../core/services/favorites.service';
     }
     .np-empty svg { width: 64px; height: 64px; }
     .np-empty p { font-size: 15px; }
+
+    /* ── Similar Music ── */
+    .np-similar {
+      width: 100%; padding: 16px 20px 24px; position: relative; z-index: 2;
+      flex-shrink: 0;
+    }
+    .np-similar-header {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+    }
+    .np-similar-title {
+      font-size: 13px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; color: rgba(255,255,255,0.5);
+    }
+    .np-similar-spinner { display: flex; align-items: center; }
+    .np-spin {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #a78bfa;
+      animation: npSpin 0.8s linear infinite;
+    }
+    .np-similar-list {
+      display: flex; flex-direction: column; gap: 4px;
+      max-height: 260px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    }
+    .np-similar-list::-webkit-scrollbar { width: 3px; }
+    .np-similar-list::-webkit-scrollbar-track { background: transparent; }
+    .np-similar-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+    .np-sim-card {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 10px; border-radius: 10px; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .np-sim-card:hover { background: rgba(255,255,255,0.06); }
+    .np-sim-card.active { background: rgba(167,139,250,0.12); }
+    .np-sim-thumb {
+      width: 42px; height: 42px; border-radius: 6px; object-fit: cover; flex-shrink: 0;
+    }
+    .np-sim-info {
+      flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+    }
+    .np-sim-title {
+      font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .np-sim-artist {
+      font-size: 11px; color: rgba(255,255,255,0.45);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .np-sim-play {
+      width: 28px; height: 28px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(255,255,255,0.4);
+    }
+    .np-sim-card.active .np-sim-play { color: #a78bfa; }
+    .np-sim-play svg { width: 18px; height: 18px; }
+    .np-similar-empty {
+      font-size: 12px; color: rgba(255,255,255,0.3);
+      text-align: center; padding: 20px 0;
+    }
   `]
 })
-export class NowPlayingModalComponent {
-  private previousVolume = parseInt(localStorage.getItem('wavify_volume') || '50', 10);
+export class NowPlayingModalComponent implements OnDestroy {
+  similarTracks: UnifiedTrack[] = [];
+  loadingSimilar = false;
+  private trackSub: Subscription;
 
   constructor(
     public playerService: PlayerService,
-    public favorites: FavoritesService
-  ) {}
+    public favorites: FavoritesService,
+    private apiService: ApiService
+  ) {
+    // Auto-fetch similar tracks whenever the current track changes
+    this.trackSub = this.playerService.currentTrack$.pipe(
+      switchMap(track => {
+        if (!track) { this.similarTracks = []; return of(null); }
+        this.loadingSimilar = true;
+        const q = `${track.title} ${track.artist}`;
+        return this.apiService.search(q, 'youtube');
+      })
+    ).subscribe({
+      next: (res) => {
+        if (res) {
+          const currentId = this.playerService.currentTrackSnapshot?.id;
+          this.similarTracks = res.youTubeResults.filter((t: UnifiedTrack) => t.id !== currentId).slice(0, 10);
+        }
+        this.loadingSimilar = false;
+      },
+      error: () => { this.loadingSimilar = false; }
+    });
+  }
+
+  ngOnDestroy() { this.trackSub?.unsubscribe(); }
 
   @HostListener('document:keydown.escape')
   close() { this.playerService.closeNowPlaying(); }
+
+  playSimilar(track: UnifiedTrack) {
+    this.playerService.play(track, [track, ...this.similarTracks]);
+  }
+
+  isCurrentTrack(track: UnifiedTrack): boolean {
+    return this.playerService.currentTrackSnapshot?.id === track.id;
+  }
 
   // ── Helpers ──────────────────────────────────────────
   private pct(clientX: number, bar: HTMLElement): number {
