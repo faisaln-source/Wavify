@@ -529,6 +529,30 @@ public class YouTubeService
     }
 
     /// <summary>
+    /// Takes a list of Spotify editorial chart tracks (title + artist) and finds their
+    /// official YouTube videos by searching "Song Artist official audio".
+    /// This produces chart-quality results equivalent to Spotify/YouTube Music trending —
+    /// verified official uploads, zero keyword-stuffed label spam.
+    /// </summary>
+    public async Task<List<UnifiedTrack>> GetChartBasedTrendingAsync(
+        IEnumerable<(string Title, string Artist)> chartTracks)
+    {
+        var ytKey = _config["YouTube:ApiKey"];
+        if (string.IsNullOrEmpty(ytKey) || !chartTracks.Any())
+            return new List<UnifiedTrack>();
+
+        // "official audio" steers YouTube search toward VEVO / artist-owned uploads
+        var fetchTasks = chartTracks.Take(20)
+            .Select(t => FetchFirstYouTubeResult($"{t.Title} {t.Artist} official audio", ytKey));
+
+        var results = await Task.WhenAll(fetchTasks);
+        return results
+            .Where(t => t != null).Cast<UnifiedTrack>()
+            .DistinctBy(t => NormalizeTitle(t.Title))
+            .ToList();
+    }
+
+    /// <summary>
     /// Dual-query fallback: runs recent (1-month) and popular (6-month) searches in parallel,
     /// then merges, deduplicates by normalized title, and sorts by velocity score.
     /// This avoids the 18-month window trap where old hits dominate "trending" results.

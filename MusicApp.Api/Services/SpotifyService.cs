@@ -318,6 +318,70 @@ public class SpotifyService
         }
     }
 
+    /// <summary>
+    /// Fetches tracks from any public Spotify editorial playlist using client credentials.
+    /// No user auth required — works for Global Top 50, Viva Latino, K-Pop Daebak, etc.
+    /// These are Spotify's own curated charts: official songs only, zero junk.
+    /// </summary>
+    public async Task<List<UnifiedTrack>> GetPublicPlaylistTracksAsync(string playlistId, int limit = 20)
+    {
+        await EnsureClientCredentialTokenAsync();
+        if (string.IsNullOrEmpty(_clientCredentialToken))
+            return new List<UnifiedTrack>();
+
+        var safeLimit = Math.Min(Math.Max(limit, 1), 50);
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            $"{SpotifyApiBase}playlists/{playlistId}/tracks?limit={safeLimit}" +
+            "&fields=items(track(id,name,uri,duration_ms,preview_url,artists(name),album(name,images)))");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _clientCredentialToken);
+        using var client = _httpClientFactory.CreateClient();
+        var response = await client.SendAsync(request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            Console.Error.WriteLine($"[Spotify] Public playlist {playlistId}: {response.StatusCode}");
+            return new List<UnifiedTrack>();
+        }
+
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+        var tracks = new List<UnifiedTrack>();
+
+        if (!doc.RootElement.TryGetProperty("items", out var items)) return tracks;
+
+        foreach (var item in items.EnumerateArray())
+        {
+            try
+            {
+                if (!item.TryGetProperty("track", out var track) || track.ValueKind == JsonValueKind.Null) continue;
+                if (!track.TryGetProperty("id", out var idEl) || idEl.ValueKind == JsonValueKind.Null) continue;
+                if (!track.TryGetProperty("artists", out var artists) || !track.TryGetProperty("album", out var album)) continue;
+
+                var artistName = artists.GetArrayLength() > 0 && artists[0].TryGetProperty("name", out var an)
+                    ? an.GetString() ?? "" : "";
+                var thumbnail = album.TryGetProperty("images", out var imgs) && imgs.GetArrayLength() > 0 && imgs[0].TryGetProperty("url", out var u)
+                    ? u.GetString() ?? "" : "";
+
+                tracks.Add(new UnifiedTrack
+                {
+                    Id = idEl.GetString() ?? "",
+                    Title = track.TryGetProperty("name", out var t) ? t.GetString() ?? "" : "",
+                    Artist = artistName,
+                    Album = album.TryGetProperty("name", out var albumEl) ? albumEl.GetString() ?? "" : "",
+                    ThumbnailUrl = thumbnail,
+                    DurationMs = track.TryGetProperty("duration_ms", out var dur) ? dur.GetInt32() : 0,
+                    Source = "spotify",
+                    SourceUri = track.TryGetProperty("uri", out var uri) ? uri.GetString() ?? "" : "",
+                    PreviewUrl = track.TryGetProperty("preview_url", out var prev) && prev.ValueKind != JsonValueKind.Null
+                        ? prev.GetString() ?? "" : ""
+                });
+            }
+            catch (Exception ex) { Console.Error.WriteLine($"[Spotify] Skip chart track: {ex.Message}"); }
+        }
+
+        return tracks;
+    }
+
     public async Task<List<UnifiedTrack>> GetLikedTracksAsync(string accessToken)
     {
         var tracks = new List<UnifiedTrack>();

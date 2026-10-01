@@ -55,10 +55,12 @@ export class ApiService {
     );
   }
 
-  /** Universal AI trending — context = any music context, fallback = search query if AI fails */
+  /** Universal AI trending — context = any music context, fallback = search query if AI fails.
+   *  Passes X-Spotify-Token so the backend can personalize with real chart data. */
   getYouTubeAITrending(context: string, fallback: string = ''): Observable<UnifiedTrack[]> {
     return this.http.get<UnifiedTrack[]>(
-      `${this.baseUrl}/youtube/ai-trending?context=${encodeURIComponent(context)}&fallback=${encodeURIComponent(fallback)}`
+      `${this.baseUrl}/youtube/ai-trending?context=${encodeURIComponent(context)}&fallback=${encodeURIComponent(fallback)}`,
+      { headers: this.getHeaders() }  // Pass Spotify token for chart-grounded personalization
     );
   }
 

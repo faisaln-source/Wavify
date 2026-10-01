@@ -865,8 +865,8 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.loadingLanguage = false;
       },
       error: () => {
-        // Fallback: regular trending search if AI endpoint fails
-        this.apiService.getYouTubeTrendingLanguage(lang.query, 18).subscribe({
+        // Fallback: regular trending search if AI endpoint fails (3-month window for recency)
+        this.apiService.getYouTubeTrendingLanguage(lang.query, 3).subscribe({
           next: (tracks) => { this.youtubeTrending = this.filterSongs(tracks); this.loadingLanguage = false; },
           error: () => { this.loadingLanguage = false; }
         });

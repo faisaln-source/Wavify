@@ -16,9 +16,49 @@ public class YouTubeController : ControllerBase
         _spotifyService = spotifyService;
     }
 
+    // Spotify editorial chart playlist IDs — all public, accessible via client credentials.
+    // These are Spotify's own curated charts: official songs only, zero junk.
+    private static readonly Dictionary<string, string> RegionToSpotifyPlaylist = new()
+    {
+        ["US"] = "37i9dQZEVXbMDoHDwVN2tF",  // Global Top 50
+        ["ES"] = "37i9dQZEVXbLRQgLOQjLVm",  // Viva Latino
+        ["KR"] = "37i9dQZF1DX9tPFwDMOaN1",  // K-Pop Daebak
+        ["IN"] = "37i9dQZF1DX0XUfTFmNBRM",  // Bollywood Arenas
+    };
+
+    /// <summary>
+    /// Trending music endpoint — 3-tier quality pipeline:
+    /// 1. Spotify editorial chart (official, curated, zero junk) → searched on YouTube
+    /// 2. AI-based trending fallback if Spotify chart unavailable
+    /// 3. YouTube mostPopular chart (last resort, heavily filtered)
+    /// </summary>
     [HttpGet("trending")]
     public async Task<IActionResult> GetTrending([FromQuery] string region = "US")
     {
+        // Tier 1: Spotify editorial chart → YouTube official audio search
+        if (RegionToSpotifyPlaylist.TryGetValue(region.ToUpper(), out var playlistId))
+        {
+            var spotifyTracks = await _spotifyService.GetPublicPlaylistTracksAsync(playlistId, limit: 20);
+            if (spotifyTracks.Count > 0)
+            {
+                var chartItems = spotifyTracks.Select(t => (t.Title, t.Artist));
+                var ytTracks = await _youtubeService.GetChartBasedTrendingAsync(chartItems);
+                if (ytTracks.Count > 0) return Ok(ytTracks);
+            }
+        }
+
+        // Tier 2: AI trending (Groq LLM + velocity ranking)
+        var regionAIContext = region.ToUpper() switch
+        {
+            "ES" => "Latin Spanish trending pop reggaeton",
+            "KR" => "K-Pop Korean trending",
+            "IN" => "Indian Bollywood Hindi trending",
+            _    => "global pop English trending"
+        };
+        var aiTracks = await _youtubeService.GetAITrendingAsync(regionAIContext);
+        if (aiTracks.Count > 0) return Ok(aiTracks);
+
+        // Tier 3: YouTube mostPopular chart with junk filter (last resort)
         var trending = await _youtubeService.GetTrendingMusicAsync(region);
         return Ok(trending);
     }
