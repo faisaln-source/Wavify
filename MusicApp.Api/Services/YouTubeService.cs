@@ -129,15 +129,21 @@ public class YouTubeService
 
     public Task<List<UnifiedTrack>> GetAITrendingLanguageAsync(string language)
     {
-        // Look up the YouTube relevanceLanguage code — forces search results to stay
-        // in the correct language (prevents Tamil appearing in Malayalam results, etc.)
         LanguageToYouTubeCode.TryGetValue(language, out var langCode);
 
-        // Explicit context string: emphasise language + film industry + official only
-        var context = $"latest trending official {language} songs from {language} films and albums (2025-2026). " +
-                      $"Songs must be in the {language} language only — NOT from other South Indian languages.";
-
-        return GetAITrendingAsync(context, $"{language} song {language}", relevanceLang: langCode);
+        // BYPASS AI LLM for regional Indian language trending.
+        // Root cause of Tamil-in-Malayalam / hallucination problems:
+        //   - LLM confuses Tamil/Malayalam/Telugu artists (e.g. Anirudh Ravichander is Tamil,
+        //     Sai Abhyankkar is Tamil — but LLM suggests them for Malayalam queries)
+        //   - LLM hallucinates songs that don't exist; random channels then upload videos
+        //     matching those fake titles
+        //   - Even with relevanceLanguage=ml, searching a Tamil song title returns the Tamil
+        //     Topic channel because the language hint applies to search, not video content
+        //
+        // Solution: direct YouTube search with relevanceLanguage + order=viewCount is
+        // FAR more accurate. YouTube's own language model correctly identifies Malayalam content.
+        var query = $"official {language} songs new 2025 2026";
+        return GetVelocityRankedFallbackAsync(query, langCode);
     }
 
     private static readonly string[] VideoJunkKeywords =
@@ -192,8 +198,15 @@ public class YouTubeService
         if (Regex.IsMatch(t, @"\|\s*new\s+\w*\s*song\s*$"))
             return true;
 
-        // Trailing "| [Adjective] [Language] Songs" = genre/category keyword stuffing
-        if (Regex.IsMatch(t, @"\|\s*\w+\s+\w+\s+songs\s*$"))
+        // Trailing "| ... songs" (plural) = category keyword stuffing at end of title
+        // Handles emojis before words: "| 🔥 Romantic Malayalam Songs" or "| Latest Tamil Songs"
+        // [^|]* matches anything within the last pipe segment (including emojis)
+        if (Regex.IsMatch(t, @"\|[^|]*\bsongs\s*$"))
+            return true;
+
+        // Trailing "| ... trending ... song" = "| 🔥 Latest Trending Tamil Video Song"
+        // Catches single-pipe SEO suffix from non-official channels with emoji + "Trending" keyword
+        if (Regex.IsMatch(t, @"\|[^|]*\btrending\b[^|]*\bsong\s*$"))
             return true;
 
         return false;
@@ -659,15 +672,18 @@ public class YouTubeService
     private async Task<List<UnifiedTrack>> GetVelocityRankedFallbackAsync(string query, string? relevanceLang = null)
     {
         // Run both strategies in parallel, passing language code so results stay language-pure
-        var byRecentTask  = SearchTrendingLanguageAsync(query, months: 1, relevanceLang);   // freshest new drops
-        var byPopularTask = SearchTrendingLanguageAsync(query, months: 6, relevanceLang);  // highest view-count window
+        var byRecentTask  = SearchTrendingLanguageAsync(query, months: 1, relevanceLang);  // freshest drops
+        var byPopularTask = SearchTrendingLanguageAsync(query, months: 6, relevanceLang);  // highest view-count
 
         var results = await Task.WhenAll(byRecentTask, byPopularTask);
 
         return results
             .SelectMany(x => x)
             .DistinctBy(t => NormalizeTitle(t.Title))
-            .OrderByDescending(ComputeVelocityScore)
+            // Dual-key sort: channel official score (×2) + velocity.
+            // Official channels (score 4-5: T-Series, Zee Music, Topic) always surface
+            // above score-0 aggregators (Hytechmedia, Taalboys Vision) even if slightly older.
+            .OrderByDescending(t => GetChannelOfficialScore(t.Artist) * 2.0 + ComputeVelocityScore(t))
             .Take(20)
             .ToList();
     }
