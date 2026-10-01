@@ -58,6 +58,9 @@ public class YouTubeService
                     - DO NOT include old songs unless they are currently trending again.
                     - Each entry must be "Song Title - Artist Name" format.
                     - Prioritize songs matching the genre/style of the reference songs if provided.
+                    - Return ONLY commercially released official songs from mainstream or indie artists.
+                    - EXCLUDE religious, devotional, bhakti, or spiritual songs entirely.
+                    - EXCLUDE fan-made videos, lyric-only channels, or unofficial label uploads.
                     """;
 
                 var payload = new
@@ -109,18 +112,36 @@ public class YouTubeService
 
     private static readonly string[] VideoJunkKeywords =
     [
+        // Format junk
         "#shorts", "#short", "mashup", "reaction", "cover", "remix",
         "in 25 seconds", "in 6 languages", "in 5 languages", "in 10 languages",
         "shorts", "nonstop", "jukebox", "playlist", "compilation",
-        "back to back", "best of", "top songs"
+        "back to back", "best of", "top songs", "fan made", "fan-made", "unofficial",
+        // Religious / devotional — explicitly excluded
+        "bhakti", "devotional", "bhajan", "aarti", "kirtan", "chalisa",
+        "mantra", "pooja", "puja", "devi geet", "devi song", "mata song",
+        "navratri", "stuti", "stotra", "bhagwan", "prayer", "religious",
+        "spiritual", "god song", "temple", "satsang"
     ];
 
     private static bool IsVideoJunk(string title, int durationMs)
     {
         if (durationMs > 0 && durationMs < 90_000) return true;  // YouTube Short (< 90 sec)
         if (durationMs > 900_000) return true;                    // Too long (> 15 min)
+
         var t = title.ToLowerInvariant();
-        return VideoJunkKeywords.Any(kw => t.Contains(kw));
+
+        // Keyword blocklist (junk content types + religious)
+        if (VideoJunkKeywords.Any(kw => t.Contains(kw))) return true;
+
+        // Hashtag-spam: 2+ '#' symbols = label SEO keyword stuffing
+        // e.g. "#Video | Song | #Artist | #NewSong2026"
+        if (title.Count(c => c == '#') >= 2) return true;
+
+        // Titles starting with "#video" are always promotional label uploads
+        if (t.StartsWith("#video") || t.StartsWith("#audio") || t.StartsWith("#lyric")) return true;
+
+        return false;
     }
 
     private async Task<UnifiedTrack?> FetchFirstYouTubeResult(string query, string apiKey)
