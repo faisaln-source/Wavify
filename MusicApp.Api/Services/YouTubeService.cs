@@ -62,6 +62,9 @@ public class YouTubeService
                     - Return ONLY commercially released official songs from mainstream or indie artists.
                     - EXCLUDE religious, devotional, bhakti, or spiritual songs entirely.
                     - EXCLUDE fan-made videos, lyric-only channels, or unofficial label uploads.
+                    - CRITICAL: Only suggest songs you are 100% certain EXIST and were officially released.
+                    - DO NOT invent or hallucinate song titles, artist collaborations, or fake releases.
+                    - If unsure whether a song exists, skip it and suggest a confirmed charting song instead.
                     """;
 
                 var payload = new
@@ -151,7 +154,7 @@ public class YouTubeService
         "spiritual", "god song", "temple", "satsang"
     ];
 
-    private static bool IsVideoJunk(string title, int durationMs)
+    private static bool IsVideoJunk(string title, int durationMs, int channelScore = 0)
     {
         if (durationMs > 0 && durationMs < 90_000) return true;  // YouTube Short (< 90 sec)
         if (durationMs > 900_000) return true;                    // Too long (> 15 min)
@@ -167,23 +170,29 @@ public class YouTubeService
         // Titles starting with "#video" are always promotional label uploads
         if (t.StartsWith("#video") || t.StartsWith("#audio") || t.StartsWith("#lyric")) return true;
 
-        // Pipe-spam: 3+ pipe characters = keyword-stuffed re-upload title
-        // e.g. "New Song 2026 | New Hindi Song | Title | Actor | Actor | New Song"
-        // Legitimate film songs rarely need more than 2 pipes.
-        if (title.Count(c => c == '|') >= 3) return true;
+        // Emoji spam: 2+ emoji characters = aggregator clickbait title
+        // Emojis are supplementary Unicode encoded as surrogate pairs in UTF-16.
+        // Indian script chars (Devanagari, Malayalam, etc.) are BMP and don't use surrogates.
+        int emojiCount = 0;
+        for (int i = 0; i < title.Length - 1; i++)
+            if (char.IsHighSurrogate(title[i]) && char.IsLowSurrogate(title[i + 1]))
+            { emojiCount++; i++; }
+        if (emojiCount >= 2) return true;
 
-        // Re-upload signature: starts with "New [Language] Song" or "New Song [Year]"
-        // This is the canonical SEO pattern used by Bollywood re-upload channels.
+        // Pipe-spam: 3+ pipes = keyword-stuffed re-upload title.
+        // EXCEPTION: major label channels (score >= 4) legitimately list cast members with pipes.
+        // e.g. T-Series: "Song | Film | Actor | Singer" is valid — Gaurav Mall doing the same is not.
+        if (channelScore < 4 && title.Count(c => c == '|') >= 3) return true;
+
+        // Re-upload signature: starts with "New [Language] Song"
         if (Regex.IsMatch(t, @"^new\s+(song|hindi|punjabi|bengali|tamil|telugu|bhojpuri|haryanvi|marathi|odia|kannada|malayalam)"))
             return true;
 
-        // Trailing "| New [X] Song" suffix = SEO keyword stuffed at end of title
+        // Trailing "| New [X] Song" suffix = SEO keyword suffix
         if (Regex.IsMatch(t, @"\|\s*new\s+\w*\s*song\s*$"))
             return true;
 
-        // Trailing "| [Adjective] [Language] Songs" = genre/category keyword stuffing suffix
-        // e.g. "Title | Romantic Malayalam Songs | Malayalam Glamour Songs"
-        // These are always aggregator channel SEO tags appended after the real title.
+        // Trailing "| [Adjective] [Language] Songs" = genre/category keyword stuffing
         if (Regex.IsMatch(t, @"\|\s*\w+\s+\w+\s+songs\s*$"))
             return true;
 
@@ -191,25 +200,38 @@ public class YouTubeService
     }
 
     /// <summary>
-    /// Scores a YouTube channel for "officialness" so we can prefer VEVO/label/artist
-    /// channels over personal re-upload accounts (e.g. "Gaurav Mall", "Prakash Jojawar").
+    /// Scores a YouTube channel for "officialness".
     /// Higher score = more likely to be the legitimate official upload.
+    /// IMPORTANT: Do NOT give high scores to generic words like "music" or "entertainment" —
+    /// aggregator channels like "MusicMayhem", "Hit Music Global" abuse these words.
     /// </summary>
     private static int GetChannelOfficialScore(string channelTitle)
     {
         var ch = channelTitle.ToLowerInvariant();
-        // Auto-generated YouTube music channels & VEVO are always official
+
+        // Tier 5: Auto-generated YouTube channels (always official) & VEVO
         if (ch.EndsWith("- topic") || ch.Contains("vevo")) return 5;
-        // Known major labels and regional music labels
-        if (ch.Contains("t-series") || ch.Contains("sony music") || ch.Contains("warner") ||
-            ch.Contains("universal") || ch.Contains("emi") || ch.Contains("atlantic") ||
-            ch.Contains("saregama") || ch.Contains("think music") || ch.Contains("zee music") ||
-            ch.Contains("tips ") || ch.Contains("lahari") || ch.Contains("speed records") ||
-            ch.Contains("yash raj") || ch.Contains("dharma") || ch.Contains("nadaan")) return 4;
-        // Generic music/entertainment/records channels
-        if (ch.Contains("records") || ch.Contains("music") || ch.Contains("entertainment") ||
-            ch.Contains("official") || ch.Contains("films")) return 3;
-        // Everything else (personal re-upload channels score 0)
+
+        // Tier 4: Known trusted music labels (major international + major regional)
+        if (ch.Contains("t-series")    || ch.Contains("sony music")   || ch.Contains("warner music") ||
+            ch.Contains("universal music") || ch.Contains("zee music") || ch.Contains("saregama")    ||
+            ch.Contains("think music") || ch.Contains("speed records") || ch.Contains("lahari")      ||
+            ch.Contains("yash raj")    || ch.Contains("dharma")        || ch.Contains("def jam")      ||
+            ch.Contains("interscope")  || ch.Contains("columbia")      || ch.Contains("atlantic")     ||
+            ch.Contains("republic records") || ch.Contains("rca records") || ch.Contains("capitol")   ||
+            ch.Contains("island records") || ch.Contains("tips films") || ch.Contains("junglee music") ||
+            ch.Contains("nadaan")      || ch.Contains("divo music")    || ch.Contains("aditya music")  ||
+            ch.Contains("sun music")   || ch.Contains("kv music")      || ch.Contains("warnerbros")) return 4;
+
+        // Tier 3: Channel name explicitly says "Official"
+        if (ch.Contains("official")) return 3;
+
+        // Tier 2: "Records" in name (most labels have this, aggregators rarely do)
+        if (ch.Contains("records")) return 2;
+
+        // Everything else: personal re-upload/aggregator channels score 0
+        // This includes: "MusicMayhem", "Hit Music Global", "Best Of Anik",
+        //   "iPop Superhits", "Pop Chartbusters", "All Good Music", "Afropulse music", etc.
         return 0;
     }
 
@@ -244,7 +266,7 @@ public class YouTubeService
                 candidates.Add(new UnifiedTrack
                 {
                     Id = videoId,
-                    Title = snippet.GetProperty("title").GetString() ?? query,
+                    Title = System.Net.WebUtility.HtmlDecode(snippet.GetProperty("title").GetString() ?? query),
                     Artist = snippet.GetProperty("channelTitle").GetString() ?? "",
                     Album = publishedAt,
                     ThumbnailUrl = thumbnail,
@@ -265,7 +287,7 @@ public class YouTubeService
             // This ensures "Gaurav Mall" / personal re-upload channels lose to T-Series/VEVO/Topic.
             return candidates
                 .OrderByDescending(t => GetChannelOfficialScore(t.Artist))
-                .FirstOrDefault(t => !IsVideoJunk(t.Title, t.DurationMs));
+                .FirstOrDefault(t => !IsVideoJunk(t.Title, t.DurationMs, GetChannelOfficialScore(t.Artist)));
         }
         catch { return null; }
     }
@@ -371,7 +393,7 @@ public class YouTubeService
             tracks.Add(new UnifiedTrack
             {
                 Id = videoId,
-                Title = snippet.GetProperty("title").GetString() ?? "",
+                Title = System.Net.WebUtility.HtmlDecode(snippet.GetProperty("title").GetString() ?? ""),
                 Artist = snippet.GetProperty("channelTitle").GetString() ?? "",
                 Album = publishedAt,
                 ThumbnailUrl = thumbnail,
@@ -383,8 +405,9 @@ public class YouTubeService
         }
 
         await EnrichWithDurations(tracks, videoIds, apiKey);
-        // Remove Shorts, long compilations and junk titles
-        return tracks.Where(t => !IsVideoJunk(t.Title, t.DurationMs)).ToList();
+        // Remove Shorts, long compilations and junk titles. Pass channel score so major labels
+        // (score >= 4) are allowed longer pipe-separated titles listing cast members.
+        return tracks.Where(t => !IsVideoJunk(t.Title, t.DurationMs, GetChannelOfficialScore(t.Artist))).ToList();
     }
 
     public async Task<List<UnifiedTrack>> GetTrendingMusicAsync(string regionCode = "US")
@@ -424,7 +447,7 @@ public class YouTubeService
             tracks.Add(new UnifiedTrack
             {
                 Id = item.GetProperty("id").GetString() ?? "",
-                Title = snippet.GetProperty("title").GetString() ?? "",
+                Title = System.Net.WebUtility.HtmlDecode(snippet.GetProperty("title").GetString() ?? ""),
                 Artist = snippet.GetProperty("channelTitle").GetString() ?? "",
                 // Store publishedAt so ComputeVelocityScore can rank by recency
                 Album = snippet.TryGetProperty("publishedAt", out var pub) ? pub.GetString() ?? "" : "",
@@ -438,7 +461,7 @@ public class YouTubeService
 
         // Apply junk filter and sort by velocity score (most recently trending first)
         return tracks
-            .Where(t => !IsVideoJunk(t.Title, t.DurationMs))
+            .Where(t => !IsVideoJunk(t.Title, t.DurationMs, GetChannelOfficialScore(t.Artist)))
             .OrderByDescending(ComputeVelocityScore)
             .ToList();
     }
