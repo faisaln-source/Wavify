@@ -135,21 +135,57 @@ public class YouTubeService
         if (VideoJunkKeywords.Any(kw => t.Contains(kw))) return true;
 
         // Hashtag-spam: 2+ '#' symbols = label SEO keyword stuffing
-        // e.g. "#Video | Song | #Artist | #NewSong2026"
         if (title.Count(c => c == '#') >= 2) return true;
 
         // Titles starting with "#video" are always promotional label uploads
         if (t.StartsWith("#video") || t.StartsWith("#audio") || t.StartsWith("#lyric")) return true;
 
+        // Pipe-spam: 3+ pipe characters = keyword-stuffed re-upload title
+        // e.g. "New Song 2026 | New Hindi Song | Title | Actor | Actor | New Song"
+        // Legitimate film songs rarely need more than 2 pipes.
+        if (title.Count(c => c == '|') >= 3) return true;
+
+        // Re-upload signature: starts with "New [Language] Song" or "New Song [Year]"
+        // This is the canonical SEO pattern used by Bollywood re-upload channels.
+        if (Regex.IsMatch(t, @"^new\s+(song|hindi|punjabi|bengali|tamil|telugu|bhojpuri|haryanvi|marathi|odia|kannada|malayalam)"))
+            return true;
+
+        // Trailing "| New [X] Song" suffix = SEO keyword stuffed at end of title
+        if (Regex.IsMatch(t, @"\|\s*new\s+\w*\s*song\s*$"))
+            return true;
+
         return false;
+    }
+
+    /// <summary>
+    /// Scores a YouTube channel for "officialness" so we can prefer VEVO/label/artist
+    /// channels over personal re-upload accounts (e.g. "Gaurav Mall", "Prakash Jojawar").
+    /// Higher score = more likely to be the legitimate official upload.
+    /// </summary>
+    private static int GetChannelOfficialScore(string channelTitle)
+    {
+        var ch = channelTitle.ToLowerInvariant();
+        // Auto-generated YouTube music channels & VEVO are always official
+        if (ch.EndsWith("- topic") || ch.Contains("vevo")) return 5;
+        // Known major labels and regional music labels
+        if (ch.Contains("t-series") || ch.Contains("sony music") || ch.Contains("warner") ||
+            ch.Contains("universal") || ch.Contains("emi") || ch.Contains("atlantic") ||
+            ch.Contains("saregama") || ch.Contains("think music") || ch.Contains("zee music") ||
+            ch.Contains("tips ") || ch.Contains("lahari") || ch.Contains("speed records") ||
+            ch.Contains("yash raj") || ch.Contains("dharma") || ch.Contains("nadaan")) return 4;
+        // Generic music/entertainment/records channels
+        if (ch.Contains("records") || ch.Contains("music") || ch.Contains("entertainment") ||
+            ch.Contains("official") || ch.Contains("films")) return 3;
+        // Everything else (personal re-upload channels score 0)
+        return 0;
     }
 
     private async Task<UnifiedTrack?> FetchFirstYouTubeResult(string query, string apiKey)
     {
         try
         {
-            // Fetch 3 candidates — pick first that passes quality checks
-            var url = $"search?part=snippet&q={Uri.EscapeDataString(query)}&type=video&videoCategoryId=10&maxResults=3&key={apiKey}";
+            // Fetch 5 candidates so we have a larger pool to rank by channel quality
+            var url = $"search?part=snippet&q={Uri.EscapeDataString(query)}&type=video&videoCategoryId=10&maxResults=5&key={apiKey}";
             var response = await _httpClient.GetAsync(url);
             if (!response.IsSuccessStatusCode) return null;
 
@@ -190,8 +226,12 @@ public class YouTubeService
             // Enrich all candidates with duration in one API call
             await EnrichWithDurations(candidates, videoIds, apiKey);
 
-            // Return the first candidate that passes quality checks
-            return candidates.FirstOrDefault(t => !IsVideoJunk(t.Title, t.DurationMs));
+            // Sort by channel official score (VEVO/Topic=5 > Labels=4 > Generic=3 > Personal=0)
+            // then pick first that passes junk filter.
+            // This ensures "Gaurav Mall" / personal re-upload channels lose to T-Series/VEVO/Topic.
+            return candidates
+                .OrderByDescending(t => GetChannelOfficialScore(t.Artist))
+                .FirstOrDefault(t => !IsVideoJunk(t.Title, t.DurationMs));
         }
         catch { return null; }
     }
