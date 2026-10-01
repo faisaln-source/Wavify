@@ -28,7 +28,8 @@ public class YouTubeService
     public async Task<List<UnifiedTrack>> GetAITrendingAsync(
         string context,
         string fallbackQuery = "",
-        IEnumerable<string>? chartHints = null)
+        IEnumerable<string>? chartHints = null,
+        string? relevanceLang = null)
     {
         var groqKey = _config["Groq:ApiKey"];
         var ytKey = _config["YouTube:ApiKey"];
@@ -88,7 +89,7 @@ public class YouTubeService
         // Fetch each AI-suggested song from YouTube in parallel
         if (songQueries.Count > 0 && !string.IsNullOrEmpty(ytKey))
         {
-            var fetchTasks = songQueries.Take(10).Select(q => FetchFirstYouTubeResult(q, ytKey));
+            var fetchTasks = songQueries.Take(10).Select(q => FetchFirstYouTubeResult(q, ytKey, relevanceLang));
             var results = await Task.WhenAll(fetchTasks);
             var tracks = results.Where(t => t != null).Cast<UnifiedTrack>().ToList();
             if (tracks.Count > 0)
@@ -103,12 +104,38 @@ public class YouTubeService
 
         // Enhanced fallback: dual-query (recent + popular), velocity-ranked and deduplicated
         var fq = string.IsNullOrWhiteSpace(fallbackQuery) ? context : fallbackQuery;
-        return await GetVelocityRankedFallbackAsync(fq);
+        return await GetVelocityRankedFallbackAsync(fq, relevanceLang);
     }
 
-    // Keep old method for backward compatibility — delegates to generalized version
-    public Task<List<UnifiedTrack>> GetAITrendingLanguageAsync(string language) =>
-        GetAITrendingAsync($"{language} music", $"{language} song");
+    // ISO 639-1 codes for YouTube relevanceLanguage parameter.
+    // This is the single most effective way to keep language results pure —
+    // YouTube will strongly prefer content in the target language.
+    private static readonly Dictionary<string, string> LanguageToYouTubeCode = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["hindi"]     = "hi",
+        ["malayalam"] = "ml",
+        ["tamil"]     = "ta",
+        ["telugu"]    = "te",
+        ["kannada"]   = "kn",
+        ["bengali"]   = "bn",
+        ["punjabi"]   = "pa",
+        ["marathi"]   = "mr",
+        ["odia"]      = "or",
+        ["bhojpuri"]  = "bh",
+    };
+
+    public Task<List<UnifiedTrack>> GetAITrendingLanguageAsync(string language)
+    {
+        // Look up the YouTube relevanceLanguage code — forces search results to stay
+        // in the correct language (prevents Tamil appearing in Malayalam results, etc.)
+        LanguageToYouTubeCode.TryGetValue(language, out var langCode);
+
+        // Explicit context string: emphasise language + film industry + official only
+        var context = $"latest trending official {language} songs from {language} films and albums (2025-2026). " +
+                      $"Songs must be in the {language} language only — NOT from other South Indian languages.";
+
+        return GetAITrendingAsync(context, $"{language} song {language}", relevanceLang: langCode);
+    }
 
     private static readonly string[] VideoJunkKeywords =
     [
@@ -154,6 +181,12 @@ public class YouTubeService
         if (Regex.IsMatch(t, @"\|\s*new\s+\w*\s*song\s*$"))
             return true;
 
+        // Trailing "| [Adjective] [Language] Songs" = genre/category keyword stuffing suffix
+        // e.g. "Title | Romantic Malayalam Songs | Malayalam Glamour Songs"
+        // These are always aggregator channel SEO tags appended after the real title.
+        if (Regex.IsMatch(t, @"\|\s*\w+\s+\w+\s+songs\s*$"))
+            return true;
+
         return false;
     }
 
@@ -180,12 +213,13 @@ public class YouTubeService
         return 0;
     }
 
-    private async Task<UnifiedTrack?> FetchFirstYouTubeResult(string query, string apiKey)
+    private async Task<UnifiedTrack?> FetchFirstYouTubeResult(string query, string apiKey, string? relevanceLang = null)
     {
         try
         {
             // Fetch 5 candidates so we have a larger pool to rank by channel quality
-            var url = $"search?part=snippet&q={Uri.EscapeDataString(query)}&type=video&videoCategoryId=10&maxResults=5&key={apiKey}";
+            var langParam = relevanceLang != null ? $"&relevanceLanguage={relevanceLang}" : "";
+            var url = $"search?part=snippet&q={Uri.EscapeDataString(query)}&type=video&videoCategoryId=10&maxResults=5{langParam}&key={apiKey}";
             var response = await _httpClient.GetAsync(url);
             if (!response.IsSuccessStatusCode) return null;
 
@@ -289,7 +323,7 @@ public class YouTubeService
     /// Search for trending language-specific music ordered by view count.
     /// publishedAfter is dynamic: 'months' months ago from now (default 18).
     /// </summary>
-    public async Task<List<UnifiedTrack>> SearchTrendingLanguageAsync(string query, int months = 3)
+    public async Task<List<UnifiedTrack>> SearchTrendingLanguageAsync(string query, int months = 3, string? relevanceLang = null)
     {
         var apiKey = _config["YouTube:ApiKey"];
         if (string.IsNullOrEmpty(apiKey))
@@ -297,6 +331,7 @@ public class YouTubeService
 
         // Dynamic: N months ago so the window always slides with today's date
         var publishedAfter = DateTime.UtcNow.AddMonths(-months).ToString("yyyy-MM-ddTHH:mm:ssZ");
+        var langParam = relevanceLang != null ? $"&relevanceLanguage={relevanceLang}" : "";
 
         var url = $"search?part=snippet" +
                   $"&q={Uri.EscapeDataString(query)}" +
@@ -305,6 +340,7 @@ public class YouTubeService
                   $"&order=viewCount" +
                   $"&publishedAfter={Uri.EscapeDataString(publishedAfter)}" +
                   $"&maxResults=25" +
+                  langParam +
                   $"&key={apiKey}";
 
         var response = await _httpClient.GetAsync(url);
@@ -597,11 +633,11 @@ public class YouTubeService
     /// then merges, deduplicates by normalized title, and sorts by velocity score.
     /// This avoids the 18-month window trap where old hits dominate "trending" results.
     /// </summary>
-    private async Task<List<UnifiedTrack>> GetVelocityRankedFallbackAsync(string query)
+    private async Task<List<UnifiedTrack>> GetVelocityRankedFallbackAsync(string query, string? relevanceLang = null)
     {
-        // Run both strategies in parallel
-        var byRecentTask = SearchTrendingLanguageAsync(query, months: 1);   // freshest new drops
-        var byPopularTask = SearchTrendingLanguageAsync(query, months: 6);  // highest view-count window
+        // Run both strategies in parallel, passing language code so results stay language-pure
+        var byRecentTask  = SearchTrendingLanguageAsync(query, months: 1, relevanceLang);   // freshest new drops
+        var byPopularTask = SearchTrendingLanguageAsync(query, months: 6, relevanceLang);  // highest view-count window
 
         var results = await Task.WhenAll(byRecentTask, byPopularTask);
 
