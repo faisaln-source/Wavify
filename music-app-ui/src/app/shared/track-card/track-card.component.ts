@@ -76,41 +76,71 @@ import { LocalPlaylist } from '../../core/models/track.model';
   styles: [`
     .track-card {
       display: flex; align-items: center; gap: 14px;
-      padding: 10px 14px; border-radius: var(--radius-sm);
-      cursor: pointer; transition: all var(--transition-fast);
+      padding: 10px 16px; border-radius: var(--radius-md);
+      cursor: pointer; transition: all var(--transition-base);
       animation: fadeIn 0.3s ease forwards;
       position: relative;
       width: 100%; max-width: 100%; box-sizing: border-box;
+      border: 1px solid transparent;
     }
-    .track-card:hover { background: var(--bg-card-hover); transform: translateX(4px); }
-    .track-card.active { background: rgba(167,139,250,0.08); border-left: 3px solid var(--accent-primary); }
+    .track-card:hover {
+      background: rgba(255,255,255,0.05);
+      border-color: rgba(255,255,255,0.06);
+      transform: translateX(4px);
+    }
+    .track-card.active {
+      background: linear-gradient(90deg, rgba(176,110,243,0.1), rgba(124,106,248,0.04));
+      border-color: rgba(176,110,243,0.25);
+    }
+    .track-card.active::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 10%; height: 80%;
+      width: 3px;
+      background: var(--accent-gradient);
+      border-radius: 0 3px 3px 0;
+      box-shadow: 0 0 10px rgba(176,110,243,0.7);
+    }
     .track-card.dropdown-active { z-index: 50; }
 
     .track-number { width: 24px; text-align: center; flex-shrink: 0; }
     .num { font-size: 14px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 
     .eq-mini { display: flex; align-items: flex-end; justify-content: center; gap: 2px; height: 14px; }
-    .eq-mini span { width: 3px; background: var(--accent-primary); border-radius: 1px; animation: equalizer 0.7s ease-in-out infinite; }
+    .eq-mini span {
+      width: 3px;
+      background: var(--accent-gradient);
+      border-radius: 1px;
+      animation: equalizer 0.7s ease-in-out infinite;
+      box-shadow: 0 0 4px rgba(176,110,243,0.4);
+    }
     .eq-mini span:nth-child(1) { animation-delay: 0s; }
     .eq-mini span:nth-child(2) { animation-delay: 0.15s; }
     .eq-mini span:nth-child(3) { animation-delay: 0.3s; }
     @keyframes equalizer { 0%, 100% { height: 3px; } 50% { height: 14px; } }
 
-    .track-thumb { width: 48px; height: 48px; border-radius: 6px; overflow: hidden; flex-shrink: 0; position: relative; }
+    .track-thumb { width: 50px; height: 50px; border-radius: 8px; overflow: hidden; flex-shrink: 0; position: relative; }
     .track-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--transition-slow); }
-    .track-card:hover .track-thumb img { transform: scale(1.08); }
+    .track-card:hover .track-thumb img { transform: scale(1.1); }
 
     .play-overlay {
-      position: absolute; inset: 0; background: rgba(0,0,0,0.5);
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.55);
       display: flex; align-items: center; justify-content: center;
-      opacity: 0; transition: opacity var(--transition-fast); color: white;
+      opacity: 0; transition: opacity var(--transition-fast);
+      color: white; backdrop-filter: blur(2px);
     }
-    .play-overlay svg { width: 22px; height: 22px; }
+    .play-overlay svg { width: 22px; height: 22px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4)); }
     .track-card:hover .play-overlay { opacity: 1; }
 
     .track-meta { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-    .track-title { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .track-title.playing { color: var(--accent-primary); }
+    .track-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .track-title.playing {
+      background: var(--accent-gradient-warm);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
     .track-artist { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* â”€â”€ Add to Playlist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */

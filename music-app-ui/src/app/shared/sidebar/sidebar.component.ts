@@ -92,45 +92,109 @@ import { PlayerService } from '../../core/services/player.service';
     </aside>
   `,
   styles: [`
-    .sidebar { width: var(--sidebar-width); height: 100%; background: var(--bg-secondary); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; padding: 20px 16px; gap: 28px; overflow-y: auto; }
-    .logo { display: flex; align-items: center; gap: 10px; padding: 4px 8px; }
-    .logo-icon { width: 32px; height: 32px; background: var(--accent-gradient); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; }
-    .logo-icon svg { width: 18px; height: 18px; }
-    .logo-text { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
-    .nav-label { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 1.5px; padding: 0 12px; margin-bottom: 4px; display: block; }
-    .nav-main, .nav-services { display: flex; flex-direction: column; gap: 4px; }
-    .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 14px; font-weight: 500; transition: all var(--transition-fast); }
-    .nav-item:hover { background: var(--bg-card-hover); color: var(--text-primary); transform: translateX(4px); }
-    .nav-item.active { background: rgba(167, 139, 250, 0.1); color: var(--accent-primary); position: relative; }
-    .nav-item.active::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 20px; background: var(--accent-gradient); border-radius: 0 4px 4px 0; }
-    .nav-item svg { width: 20px; height: 20px; flex-shrink: 0; }
-    .service-card { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--radius-md); background: var(--bg-card); border: 1px solid var(--border-subtle); transition: all var(--transition-fast); }
-    .service-card:hover { background: var(--bg-card-hover); border-color: var(--border-medium); }
-    .service-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .service-icon svg { width: 20px; height: 20px; }
-    .service-icon.spotify { background: rgba(29, 185, 84, 0.15); color: var(--accent-spotify); }
-    .service-icon.youtube { background: rgba(255, 0, 0, 0.15); color: var(--accent-youtube); }
-    .service-info { display: flex; flex-direction: column; gap: 4px; }
-    .service-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-    .service-status { font-size: 11px; color: var(--text-tertiary); display: flex; align-items: center; gap: 5px; }
-    .service-status.connected { color: #4ade80; }
-    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; animation: pulse-dot 2s ease-in-out infinite; }
-    .status-dot.sdk-active { background: #a78bfa; }
-    .status-dot.offline { background: #6b7280; animation: none; }
-    .clickable { cursor: pointer; }
-    .clickable:hover { border-color: rgba(29,185,84,0.4) !important; background: rgba(29,185,84,0.06) !important; }
-    .connect-hint { font-size: 10px; color: #1db954; font-weight: 600; margin-top: 1px; }
-    .disconnect-btn { margin-top: 4px; font-size: 10px; color: var(--text-tertiary); background: none; border: none; cursor: pointer; padding: 0; text-decoration: underline; }
-    .disconnect-btn:hover { color: #f87171; }
-    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .sidebar {
+      width: var(--sidebar-width); height: 100%;
+      background: rgba(9,9,15,0.85);
+      backdrop-filter: blur(40px) saturate(1.8);
+      border-right: 1px solid var(--border-subtle);
+      display: flex; flex-direction: column;
+      padding: 24px 16px; gap: 28px; overflow-y: auto;
+    }
+
+    /* Logo */
+    .logo { display:flex; align-items:center; gap:12px; padding:4px 8px; }
+    .logo-icon {
+      width:38px; height:38px;
+      background: var(--accent-gradient);
+      border-radius:12px;
+      display:flex; align-items:center; justify-content:center;
+      color:white;
+      box-shadow: 0 4px 20px rgba(176,110,243,0.45);
+    }
+    .logo-icon svg { width:20px; height:20px; }
+    .logo-text { font-size:24px; font-weight:900; letter-spacing:-0.8px; }
+
+    /* Nav */
+    .nav-label {
+      font-size:10px; font-weight:700; color:var(--text-tertiary);
+      text-transform:uppercase; letter-spacing:2px;
+      padding:0 12px; margin-bottom:4px; display:block;
+    }
+    .nav-main,.nav-services { display:flex; flex-direction:column; gap:3px; }
+
+    .nav-item {
+      display:flex; align-items:center; gap:12px;
+      padding:11px 14px; border-radius:var(--radius-md);
+      color:var(--text-secondary); font-size:14px; font-weight:500;
+      transition:all var(--transition-fast);
+      position:relative; overflow:hidden;
+    }
+    .nav-item:hover {
+      background:var(--bg-card-hover); color:var(--text-primary);
+      transform:translateX(5px);
+    }
+    .nav-item.active {
+      background: rgba(176,110,243,0.1);
+      color: var(--accent-primary);
+    }
+    .nav-item.active::before {
+      content:'';
+      position:absolute; left:0; top:50%; transform:translateY(-50%);
+      width:3px; height:24px;
+      background:var(--accent-gradient);
+      border-radius:0 4px 4px 0;
+      box-shadow: 0 0 12px rgba(176,110,243,0.6);
+    }
+    .nav-item svg { width:20px; height:20px; flex-shrink:0; }
+
+    /* Service cards */
+    .service-card {
+      display:flex; align-items:center; gap:12px;
+      padding:13px 14px; border-radius:var(--radius-lg);
+      background:var(--bg-card); border:1px solid var(--border-subtle);
+      transition:all var(--transition-base);
+    }
+    .service-card:hover { background:var(--bg-card-hover); border-color:var(--border-medium); }
+    .service-icon { width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .service-icon svg { width:20px; height:20px; }
+    .service-icon.spotify { background:rgba(29,185,84,0.15); color:var(--accent-spotify); }
+    .service-icon.youtube { background:rgba(255,51,51,0.15); color:var(--accent-youtube); }
+    .service-info { display:flex; flex-direction:column; gap:3px; }
+    .service-name { font-size:13px; font-weight:700; color:var(--text-primary); }
+    .service-status { font-size:11px; color:var(--text-tertiary); display:flex; align-items:center; gap:5px; }
+    .service-status.connected { color:#4ade80; }
+    .status-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; animation:pulse-dot 2s ease-in-out infinite; }
+    .status-dot.sdk-active { background:var(--accent-primary); box-shadow:0 0 6px rgba(176,110,243,0.6); }
+    .status-dot.offline { background:#4b5563; animation:none; }
+    .clickable { cursor:pointer; }
+    .clickable:hover { border-color:rgba(29,185,84,0.45)!important; background:rgba(29,185,84,0.07)!important; }
+    .connect-hint { font-size:10px; color:#1db954; font-weight:600; margin-top:1px; }
+    .disconnect-btn { margin-top:4px; font-size:10px; color:var(--text-tertiary); background:none; border:none; cursor:pointer; padding:0; text-decoration:underline; }
+    .disconnect-btn:hover { color:#f87171; }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
     /* Queue shortcut */
-    .queue-shortcut { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--radius-md); background: var(--bg-card); border: 1px solid var(--border-subtle); cursor: pointer; transition: all var(--transition-fast); margin-top: auto; }
-    .queue-shortcut:hover { background: var(--bg-card-hover); border-color: rgba(167,139,250,0.3); }
-    .queue-shortcut-icon { width: 36px; height: 36px; border-radius: 10px; background: rgba(167,139,250,0.15); color: var(--accent-primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .queue-shortcut-icon svg { width: 20px; height: 20px; }
-    .queue-shortcut-info { display: flex; flex-direction: column; gap: 3px; }
-    .queue-shortcut-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
-    .queue-shortcut-count { font-size: 11px; color: var(--accent-primary); font-weight: 500; }
+    .queue-shortcut {
+      display:flex; align-items:center; gap:12px;
+      padding:13px 14px; border-radius:var(--radius-lg);
+      background:linear-gradient(135deg, rgba(176,110,243,0.08), rgba(124,106,248,0.05));
+      border:1px solid rgba(176,110,243,0.2);
+      cursor:pointer; transition:all var(--transition-base); margin-top:auto;
+    }
+    .queue-shortcut:hover {
+      background:linear-gradient(135deg,rgba(176,110,243,0.15),rgba(124,106,248,0.1));
+      border-color:rgba(176,110,243,0.4);
+      box-shadow:0 0 20px rgba(176,110,243,0.12);
+    }
+    .queue-shortcut-icon {
+      width:38px; height:38px; border-radius:11px;
+      background:rgba(176,110,243,0.18); color:var(--accent-primary);
+      display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .queue-shortcut-icon svg { width:20px; height:20px; }
+    .queue-shortcut-info { display:flex; flex-direction:column; gap:3px; }
+    .queue-shortcut-label { font-size:13px; font-weight:700; color:var(--text-primary); }
+    .queue-shortcut-count { font-size:11px; color:var(--accent-primary); font-weight:600; }
   `]
 })
 export class SidebarComponent {

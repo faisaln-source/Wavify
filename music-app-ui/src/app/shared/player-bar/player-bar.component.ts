@@ -141,15 +141,26 @@ import { FavoritesService } from '../../core/services/favorites.service';
       display: grid;
       grid-template-columns: 1fr 2fr 1fr;
       align-items: center;
-      padding: 0 24px;
+      padding: 0 28px;
       gap: 20px;
       position: relative;
       overflow: hidden;
-      background: var(--bg-glass-strong);
-      backdrop-filter: blur(40px) saturate(1.6);
-      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(8,8,16,0.95);
+      backdrop-filter: blur(60px) saturate(2);
+      border-top: 1px solid rgba(176,110,243,0.1);
       transition: all var(--transition-base);
     }
+    /* Ambient gradient line at top of player */
+    .player-bar::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, rgba(176,110,243,0.5) 30%, rgba(244,114,182,0.5) 60%, transparent 100%);
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    .player-bar.is-playing::before { opacity: 1; }
 
     /* Mobile-only controls: hidden on desktop */
     .mobile-controls { display: none; }
@@ -207,19 +218,20 @@ import { FavoritesService } from '../../core/services/favorites.service';
     }
 
     .album-art {
-      width: 60px;
-      height: 60px;
-      border-radius: 8px;
+      width: 64px;
+      height: 64px;
+      border-radius: 12px;
       overflow: hidden;
       position: relative;
       flex-shrink: 0;
-      box-shadow: var(--shadow-md);
+      box-shadow: 0 6px 24px rgba(0,0,0,0.6);
       transition: all var(--transition-slow);
     }
 
     .album-art.spinning {
       border-radius: 50%;
       animation: vinyl-spin 8s linear infinite;
+      box-shadow: 0 0 0 2px rgba(176,110,243,0.3), 0 6px 28px rgba(176,110,243,0.25);
     }
 
     .album-art.spinning .vinyl-ring {
@@ -374,40 +386,39 @@ import { FavoritesService } from '../../core/services/favorites.service';
       color: var(--accent-primary);
     }
 
-    /* Play/Pause button */
     .play-pause-btn {
-      width: 44px;
-      height: 44px;
+      width: 48px;
+      height: 48px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       background: var(--accent-gradient);
       color: white;
-      box-shadow: 0 4px 16px rgba(167, 139, 250, 0.4);
+      box-shadow: 0 6px 24px rgba(176,110,243,0.5);
       transition: all var(--transition-spring);
       position: relative;
       overflow: hidden;
     }
 
     .play-pause-btn svg {
-      width: 20px;
-      height: 20px;
+      width: 22px;
+      height: 22px;
       position: relative;
       z-index: 1;
     }
 
     .play-pause-btn:hover {
-      transform: scale(1.1);
-      box-shadow: 0 6px 28px rgba(167, 139, 250, 0.55);
+      transform: scale(1.12);
+      box-shadow: 0 8px 32px rgba(176,110,243,0.65);
     }
 
     .play-pause-btn:active {
-      transform: scale(0.95);
+      transform: scale(0.94);
     }
 
     .play-pause-btn.playing {
-      animation: pulse-glow 3s ease-in-out infinite;
+      animation: pulse-glow 2.5s ease-in-out infinite;
     }
 
     .btn-ripple {
@@ -466,13 +477,13 @@ import { FavoritesService } from '../../core/services/favorites.service';
 
     .progress-glow {
       position: absolute;
-      right: 0;
-      top: -3px;
-      width: 20px;
-      height: 10px;
+      right: -2px;
+      top: -5px;
+      width: 14px;
+      height: 14px;
       background: var(--accent-primary);
-      filter: blur(6px);
-      opacity: 0.6;
+      filter: blur(5px);
+      opacity: 0.9;
       border-radius: 50%;
     }
 

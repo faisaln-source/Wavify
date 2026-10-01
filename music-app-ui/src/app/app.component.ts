@@ -13,6 +13,13 @@ import { CommonModule } from '@angular/common';
   imports: [RouterOutlet, SidebarComponent, PlayerBarComponent, QueuePanelComponent, ChatPanelComponent, NowPlayingModalComponent, CommonModule, RouterLink, RouterLinkActive],
   template: `
     <div class="app-shell" [class.sidebar-open]="sidebarOpen()">
+      <!-- Aurora ambient background orbs -->
+      <div class="aurora" aria-hidden="true">
+        <div class="orb orb-a"></div>
+        <div class="orb orb-b"></div>
+        <div class="orb orb-c"></div>
+      </div>
+
       <!-- Mobile: top header bar -->
       <header class="mobile-header">
         <button class="hamburger" (click)="toggleSidebar()" id="btn-hamburger" aria-label="Menu">
@@ -64,56 +71,94 @@ import { CommonModule } from '@angular/common';
     </div>
   `,
   styles: [`
+    /* Aurora orb background */
+    .aurora {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.12;
+    }
+    .orb-a {
+      width: 700px; height: 700px;
+      top: -200px; left: -150px;
+      background: radial-gradient(circle, #b06ef3, #7c6af8, transparent 70%);
+      animation: orb-float-a 20s ease-in-out infinite;
+    }
+    .orb-b {
+      width: 600px; height: 600px;
+      top: 30%; right: -200px;
+      background: radial-gradient(circle, #f472b6, #c084fc, transparent 70%);
+      animation: orb-float-b 25s ease-in-out infinite;
+    }
+    .orb-c {
+      width: 500px; height: 500px;
+      bottom: 80px; left: 30%;
+      background: radial-gradient(circle, #22d3ee, #818cf8, transparent 70%);
+      animation: orb-float-c 18s ease-in-out infinite;
+      opacity: 0.07;
+    }
+
+    /* App Shell Grid */
     .app-shell {
       display: grid;
       grid-template-columns: var(--sidebar-width) 1fr;
       grid-template-rows: 1fr var(--player-height);
       height: 100vh;
       overflow: hidden;
+      position: relative;
     }
 
     .main-content {
       grid-column: 2;
       grid-row: 1;
       overflow: hidden;
-      background: var(--bg-primary);
+      background: transparent;
       position: relative;
+      z-index: 1;
     }
 
     .player-wrapper {
       grid-column: 1 / -1;
       grid-row: 2;
+      position: relative;
+      z-index: 10;
     }
 
     app-sidebar {
       grid-column: 1;
       grid-row: 1;
+      position: relative;
+      z-index: 5;
     }
 
-    app-queue-panel {
-      position: fixed;
-      z-index: 10;
-    }
+    app-queue-panel { position: fixed; z-index: 100; }
 
-    /* ── Elements hidden on desktop ── */
-    .mobile-header { display: none; }
+    /* ── Hidden on desktop ── */
+    .mobile-header    { display: none; }
     .mobile-bottom-nav { display: none; }
-    .sidebar-overlay { display: none; }
+    .sidebar-overlay  { display: none; }
 
-    /* ── Mobile (<= 768px) ── */
+    /* ── Mobile (≤ 768px) ── */
     @media (max-width: 768px) {
       .app-shell {
         grid-template-columns: 1fr;
         grid-template-rows: 52px 1fr 70px 56px;
       }
 
-      /* Mobile top header */
       .mobile-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
         padding: 0 16px;
-        background: var(--bg-secondary);
+        background: rgba(9,9,15,0.95);
+        backdrop-filter: blur(20px);
         border-bottom: 1px solid var(--border-subtle);
         grid-column: 1;
         grid-row: 1;
@@ -127,12 +172,10 @@ import { CommonModule } from '@angular/common';
         color: var(--text-primary); border-radius: 8px;
         transition: background 0.15s;
       }
-      .hamburger:hover { background: rgba(255,255,255,0.05); }
+      .hamburger:hover { background: rgba(255,255,255,0.06); }
       .hamburger svg { width: 20px; height: 20px; }
 
-      .mobile-logo {
-        font-size: 18px; font-weight: 800; letter-spacing: -0.5px;
-      }
+      .mobile-logo { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
 
       .mobile-logo-icon {
         width: 32px; height: 32px;
@@ -140,75 +183,62 @@ import { CommonModule } from '@angular/common';
         border-radius: 8px;
         display: flex; align-items: center; justify-content: center;
         color: white;
+        box-shadow: 0 4px 12px rgba(176,110,243,0.4);
       }
       .mobile-logo-icon svg { width: 16px; height: 16px; }
 
-      /* Sidebar: fullscreen drawer on mobile */
       app-sidebar {
         position: fixed;
         top: 0; left: -100%;
         width: 260px; height: 100%;
         z-index: 200;
-        transition: left 0.25s ease;
-        box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+        transition: left 0.28s cubic-bezier(0.4,0,0.2,1);
+        box-shadow: 6px 0 40px rgba(0,0,0,0.6);
       }
+      .sidebar-open app-sidebar { left: 0; }
 
-      .sidebar-open app-sidebar {
-        left: 0;
-      }
-
-      /* Overlay */
       .sidebar-overlay {
         display: block;
         position: fixed;
         inset: 0;
-        background: rgba(0,0,0,0.5);
+        background: rgba(0,0,0,0.6);
         z-index: 199;
-        backdrop-filter: blur(2px);
+        backdrop-filter: blur(3px);
       }
 
       .main-content {
         grid-column: 1;
         grid-row: 2;
         overflow-x: hidden;
-        padding-bottom: 0;
       }
 
-      .player-wrapper {
-        grid-column: 1;
-        grid-row: 3;
-      }
+      .player-wrapper { grid-column: 1; grid-row: 3; }
 
-      /* Bottom nav */
       .mobile-bottom-nav {
         display: flex;
         align-items: center;
         justify-content: space-around;
         grid-column: 1;
         grid-row: 4;
-        background: var(--bg-secondary);
+        background: rgba(9,9,15,0.95);
+        backdrop-filter: blur(20px);
         border-top: 1px solid var(--border-subtle);
-        padding: 6px 0 4px;
-        padding-bottom: max(4px, env(safe-area-inset-bottom));
+        padding: 6px 0;
+        padding-bottom: max(6px, env(safe-area-inset-bottom));
       }
 
       .mob-nav-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 2px;
-        flex: 1;
-        padding: 4px;
+        display: flex; flex-direction: column; align-items: center; gap: 2px;
+        flex: 1; padding: 4px;
         color: var(--text-tertiary);
-        font-size: 10px;
-        font-weight: 600;
+        font-size: 10px; font-weight: 600;
         text-decoration: none;
         transition: color 0.15s;
         border-radius: 8px;
       }
       .mob-nav-item svg { width: 22px; height: 22px; }
       .mob-nav-item.active { color: var(--accent-primary); }
-      .mob-nav-item:hover { color: var(--text-secondary); }
+      .mob-nav-item:hover  { color: var(--text-secondary); }
     }
   `]
 })

@@ -290,31 +290,34 @@ interface TrendingRegion {
   `,
   styles: [`
     .home-page {
-      padding: 24px 28px;
+      padding: 28px 32px;
       padding-bottom: 120px;
       height: 100%;
       overflow-y: auto;
       overflow-x: hidden;
+      background: transparent;
     }
 
-    .page-header { margin-bottom: 20px; }
+    .page-header { margin-bottom: 24px; }
 
     /* ── Inline Search Bar ── */
     .home-search-bar {
       display: flex; align-items: center; gap: 10px;
-      background: var(--bg-card); border: 1px solid var(--border-subtle);
-      border-radius: 14px; padding: 0 14px; height: 48px;
-      margin-top: 16px;
+      background: rgba(255,255,255,0.045);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px; padding: 0 16px; height: 52px;
+      margin-top: 18px;
+      backdrop-filter: blur(20px);
       transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
     }
     .home-search-bar:focus-within {
-      border-color: var(--accent-primary);
-      box-shadow: 0 0 0 3px rgba(167,139,250,0.15);
+      border-color: rgba(176,110,243,0.5);
+      box-shadow: 0 0 0 3px rgba(176,110,243,0.12), 0 0 20px rgba(176,110,243,0.08);
     }
     .home-search-bar .search-icon { width: 18px; height: 18px; color: var(--text-tertiary); flex-shrink: 0; }
     .home-search-bar .search-input {
       flex: 1; background: none; border: none; outline: none;
-      color: var(--text-primary); font-size: 14px; font-family: inherit;
+      color: var(--text-primary); font-size: 15px; font-family: inherit; font-weight: 500;
       min-width: 0;
     }
     .home-search-bar .search-input::placeholder { color: var(--text-tertiary); }
@@ -365,21 +368,24 @@ interface TrendingRegion {
     .search-empty strong { color: var(--text-primary); }
 
     .greeting h1 {
-      font-size: 30px;
-      font-weight: 800;
-      letter-spacing: -1px;
-      margin-bottom: 4px;
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: -1.5px;
+      margin-bottom: 6px;
     }
-    .greeting p { color: var(--text-secondary); font-size: 14px; }
+    .greeting p { color: var(--text-secondary); font-size: 14px; font-weight: 400; }
 
     /* ── Mood Section ── */
-    .mood-section { margin-bottom: 24px; }
+    .mood-section { margin-bottom: 28px; }
 
     .section-title {
-      font-size: 17px;
-      font-weight: 700;
+      font-size: 18px;
+      font-weight: 800;
       margin-bottom: 14px;
-      letter-spacing: -0.3px;
+      letter-spacing: -0.4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .mood-chips {
@@ -391,41 +397,43 @@ interface TrendingRegion {
     .mood-chip {
       display: flex;
       align-items: center;
-      gap: 7px;
-      padding: 10px 18px;
+      gap: 8px;
+      padding: 10px 20px;
       border-radius: 100px;
-      border: 1px solid var(--border-subtle);
-      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.07);
+      background: rgba(255,255,255,0.04);
       color: var(--text-secondary);
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all var(--transition-base);
       position: relative;
       overflow: hidden;
+      backdrop-filter: blur(10px);
     }
 
     .mood-chip::before {
       content: '';
       position: absolute;
       inset: 0;
-      background: var(--chip-gradient, linear-gradient(135deg,#8b5cf6,#7c3aed));
+      background: var(--chip-gradient, linear-gradient(135deg,#b06ef3,#7c6af8));
       opacity: 0;
-      transition: opacity 0.2s;
+      transition: opacity 0.25s;
     }
 
-    .mood-chip:hover::before, .mood-chip.active::before { opacity: 0.12; }
+    .mood-chip:hover::before, .mood-chip.active::before { opacity: 0.14; }
 
     .mood-chip.active {
-      border-color: transparent;
+      border-color: rgba(176,110,243,0.45);
       color: var(--text-primary);
-      box-shadow: 0 0 0 2px rgba(139,92,246,0.4);
+      box-shadow: 0 0 0 1px rgba(176,110,243,0.25), 0 4px 16px rgba(176,110,243,0.12);
     }
 
     .mood-chip:hover {
       transform: translateY(-2px);
-      border-color: rgba(139,92,246,0.3);
+      border-color: rgba(176,110,243,0.3);
       color: var(--text-primary);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     }
 
     .mood-emoji { font-size: 18px; position: relative; }
