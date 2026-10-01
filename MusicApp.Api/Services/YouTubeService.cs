@@ -107,7 +107,7 @@ public class YouTubeService
 
         // Enhanced fallback: dual-query (recent + popular), velocity-ranked and deduplicated
         var fq = string.IsNullOrWhiteSpace(fallbackQuery) ? context : fallbackQuery;
-        return await GetVelocityRankedFallbackAsync(fq, relevanceLang);
+        return await GetVelocityRankedFallbackAsync(fq, relevanceLang: relevanceLang, languageName: null);
     }
 
     // ISO 639-1 codes for YouTube relevanceLanguage parameter.
@@ -132,18 +132,16 @@ public class YouTubeService
         LanguageToYouTubeCode.TryGetValue(language, out var langCode);
 
         // BYPASS AI LLM for regional Indian language trending.
-        // Root cause of Tamil-in-Malayalam / hallucination problems:
-        //   - LLM confuses Tamil/Malayalam/Telugu artists (e.g. Anirudh Ravichander is Tamil,
-        //     Sai Abhyankkar is Tamil — but LLM suggests them for Malayalam queries)
-        //   - LLM hallucinates songs that don't exist; random channels then upload videos
-        //     matching those fake titles
-        //   - Even with relevanceLanguage=ml, searching a Tamil song title returns the Tamil
-        //     Topic channel because the language hint applies to search, not video content
+        // relevanceLanguage alone is insufficient: YouTube treats it as an audience-preference
+        // signal, not a content-language filter. Tamil songs by Anirudh Ravichander appear in
+        // Malayalam results because Kerala audiences watch Tamil films.
         //
-        // Solution: direct YouTube search with relevanceLanguage + order=viewCount is
-        // FAR more accurate. YouTube's own language model correctly identifies Malayalam content.
-        var query = $"official {language} songs new 2025 2026";
-        return GetVelocityRankedFallbackAsync(query, langCode);
+        // Solution: two specific film/album queries + IsLikelyTargetLanguage script filter.
+        // The script filter rejects any result whose title has no target-language Unicode
+        // characters AND no language name keywords AND channel score < 2.
+        var q1 = $"new {language} movie songs 2025 2026 official";
+        var q2 = $"latest {language} album songs 2026 official";
+        return GetVelocityRankedFallbackAsync(q1, q2, langCode, language);
     }
 
     private static readonly string[] VideoJunkKeywords =
@@ -669,20 +667,79 @@ public class YouTubeService
     /// then merges, deduplicates by normalized title, and sorts by velocity score.
     /// This avoids the 18-month window trap where old hits dominate "trending" results.
     /// </summary>
-    private async Task<List<UnifiedTrack>> GetVelocityRankedFallbackAsync(string query, string? relevanceLang = null)
+    /// <summary>
+    /// Returns true if the track is likely in the target language.
+    /// Checks Unicode script ranges (e.g. Malayalam U+0D00-U+0D7F), language name keywords,
+    /// and industry terms. Used to reject Tamil/Sambalpuri/Santhali songs from Malayalam tab.
+    /// A result passes if ANY indicator matches — we only reject when NONE match AND score &lt; 2.
+    /// </summary>
+    private static bool IsLikelyTargetLanguage(UnifiedTrack t, string language)
     {
-        // Run both strategies in parallel, passing language code so results stay language-pure
-        var byRecentTask  = SearchTrendingLanguageAsync(query, months: 1, relevanceLang);  // freshest drops
-        var byPopularTask = SearchTrendingLanguageAsync(query, months: 6, relevanceLang);  // highest view-count
+        var title = t.Title.ToLowerInvariant();
+        var channel = t.Artist.ToLowerInvariant();
+        var langLower = language.ToLowerInvariant();
+
+        // Explicit language name or industry term in title or channel
+        if (title.Contains(langLower) || channel.Contains(langLower)) return true;
+
+        var industryTerms = language.ToUpperInvariant() switch
+        {
+            "MALAYALAM" => new[] { "mollywood", "kerala", "manorama", "surya tv" },
+            "TAMIL"     => new[] { "kollywood", "tamilnadu", "kodambakkam" },
+            "TELUGU"    => new[] { "tollywood", "hyderabad" },
+            "KANNADA"   => new[] { "sandalwood", "bangalore" },
+            "HINDI"     => new[] { "bollywood", "mumbai" },
+            "BENGALI"   => new[] { "tollywood", "kolkata" },
+            _           => Array.Empty<string>()
+        };
+        if (industryTerms.Any(term => title.Contains(term) || channel.Contains(term))) return true;
+
+        // Unicode script detection in title — the most reliable signal.
+        // Each Indian language has its own Unicode block; presence of even one char confirms language.
+        bool hasScript = language.ToUpperInvariant() switch
+        {
+            "MALAYALAM" => t.Title.Any(ch => ch >= 0x0D00 && ch <= 0x0D7F),
+            "TAMIL"     => t.Title.Any(ch => ch >= 0x0B80 && ch <= 0x0BFF),
+            "TELUGU"    => t.Title.Any(ch => ch >= 0x0C00 && ch <= 0x0C7F),
+            "KANNADA"   => t.Title.Any(ch => ch >= 0x0C80 && ch <= 0x0CFF),
+            "HINDI"     => t.Title.Any(ch => ch >= 0x0900 && ch <= 0x097F),
+            "BENGALI"   => t.Title.Any(ch => ch >= 0x0980 && ch <= 0x09FF),
+            "PUNJABI"   => t.Title.Any(ch => ch >= 0x0A00 && ch <= 0x0A7F),
+            _           => true   // Unknown language: don't filter
+        };
+        if (hasScript) return true;
+
+        // No language indicator in title or channel.
+        // Allow if from a known major label (score >= 2) — they rarely mis-categorise.
+        // Reject score-0 aggregators with no language signal (Santhali, Sambalpuri, Tamil, etc.)
+        return GetChannelOfficialScore(t.Artist) >= 2;
+    }
+
+    private async Task<List<UnifiedTrack>> GetVelocityRankedFallbackAsync(
+        string query, string? relevanceLang = null, string? languageName = null)
+        => await GetVelocityRankedFallbackAsync(query, query, relevanceLang, languageName);
+
+    private async Task<List<UnifiedTrack>> GetVelocityRankedFallbackAsync(
+        string recentQuery, string popularQuery, string? relevanceLang = null, string? languageName = null)
+    {
+        // Two queries: one for freshest drops, one for highest-view-count over longer window
+        var byRecentTask  = SearchTrendingLanguageAsync(recentQuery,  months: 2, relevanceLang);
+        var byPopularTask = SearchTrendingLanguageAsync(popularQuery, months: 12, relevanceLang);
 
         var results = await Task.WhenAll(byRecentTask, byPopularTask);
 
-        return results
+        var candidates = results
             .SelectMany(x => x)
-            .DistinctBy(t => NormalizeTitle(t.Title))
+            .DistinctBy(t => NormalizeTitle(t.Title));
+
+        // Language-purity filter: for regional language tabs, reject results that have
+        // no script chars, no language keywords, AND are from low-score channels.
+        // This filters: Anirudh's Tamil DC songs, Santhali, Sambalpuri, etc. from Malayalam tab.
+        if (!string.IsNullOrEmpty(languageName))
+            candidates = candidates.Where(t => IsLikelyTargetLanguage(t, languageName));
+
+        return candidates
             // Dual-key sort: channel official score (×2) + velocity.
-            // Official channels (score 4-5: T-Series, Zee Music, Topic) always surface
-            // above score-0 aggregators (Hytechmedia, Taalboys Vision) even if slightly older.
             .OrderByDescending(t => GetChannelOfficialScore(t.Artist) * 2.0 + ComputeVelocityScore(t))
             .Take(20)
             .ToList();
