@@ -281,8 +281,13 @@ interface TrendingRegion {
       </section>
 
       <div class="loading" *ngIf="loading">
-        <div class="spinner"></div>
-        <span>Loading your music...</span>
+        <div class="skel-row" *ngFor="let _ of [1,2,3,4,5,6,7,8]">
+          <div class="skel-thumb"></div>
+          <div class="skel-text">
+            <div class="skel-line"></div>
+            <div class="skel-line short"></div>
+          </div>
+        </div>
       </div>
 
       </ng-container><!-- /!searchQuery -->
@@ -530,46 +535,46 @@ interface TrendingRegion {
     .hero-section {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      margin-bottom: 24px;
+      gap: 16px;
+      margin-bottom: 28px;
     }
-    .hero-section.hero-single {
-      grid-template-columns: 1fr;
-    }
+    .hero-section.hero-single { grid-template-columns: 1fr; }
 
     .hero-card {
       position: relative;
-      border-radius: var(--radius-lg);
-      padding: 22px;
+      border-radius: var(--radius-xl);
+      padding: 26px;
       overflow: hidden;
       cursor: pointer;
-      transition: all var(--transition-base);
-      min-height: 140px;
+      transition: all var(--transition-slow);
+      min-height: 160px;
       display: flex;
       align-items: flex-end;
+      border: 1px solid rgba(255,255,255,0.07);
     }
-    .hero-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+    .hero-card:hover {
+      transform: translateY(-4px) scale(1.01);
+      box-shadow: var(--shadow-lg);
+    }
 
-    .hero-bg {
-      position: absolute;
-      inset: 0;
-      opacity: 0.15;
-    }
-    .spotify-bg { background: linear-gradient(135deg, #1db954 0%, #1ed760 100%); }
-    .youtube-bg { background: linear-gradient(135deg, #ff0000 0%, #ff4444 100%); }
+    .hero-bg { position: absolute; inset: 0; opacity: 0.2; transition: opacity 0.3s; }
+    .hero-card:hover .hero-bg { opacity: 0.28; }
+    .spotify-bg  { background: linear-gradient(135deg, #1db954 0%, #1ed760 100%); }
+    .youtube-bg  { background: linear-gradient(135deg, #ff1111 0%, #ff6644 100%); }
 
     .hero-content { position: relative; z-index: 1; }
-    .hero-content h2 { font-size: 20px; font-weight: 700; margin: 8px 0 4px; }
-    .hero-content p { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
+    .hero-content h2 { font-size: 22px; font-weight: 900; margin: 8px 0 4px; letter-spacing: -0.5px; }
+    .hero-content p { font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; }
 
     .hero-play-btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 8px 20px; background: var(--accent-gradient);
-      border-radius: 100px; font-size: 12px; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 24px; background: var(--accent-gradient);
+      border-radius: 100px; font-size: 13px; font-weight: 700;
       color: white; transition: all var(--transition-fast);
-      box-shadow: 0 2px 12px rgba(167,139,250,0.3);
+      box-shadow: 0 4px 20px rgba(176,110,243,0.4);
+      letter-spacing: -0.2px;
     }
-    .hero-play-btn:hover { transform: scale(1.05); box-shadow: 0 4px 20px rgba(167,139,250,0.5); }
+    .hero-play-btn:hover { transform: scale(1.06); box-shadow: 0 6px 28px rgba(176,110,243,0.6); }
     .hero-play-btn svg { width: 14px; height: 14px; }
 
     /* ── Spotify CTA Banner ── */
@@ -577,38 +582,36 @@ interface TrendingRegion {
       display: flex;
       align-items: center;
       gap: 14px;
-      padding: 14px 20px;
-      margin-bottom: 20px;
-      background: rgba(29,185,84,0.08);
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, rgba(29,185,84,0.07), rgba(29,185,84,0.03));
       border: 1px solid rgba(29,185,84,0.2);
-      border-radius: var(--radius-lg);
+      border-radius: var(--radius-xl);
       animation: fadeIn 0.4s ease;
+      backdrop-filter: blur(20px);
     }
     .spotify-cta-banner.warn {
-      background: rgba(248,113,113,0.07);
+      background: linear-gradient(135deg, rgba(248,113,113,0.07), rgba(248,113,113,0.03));
       border-color: rgba(248,113,113,0.2);
     }
-    .cta-icon { font-size: 28px; flex-shrink: 0; color: #1db954; }
-    .spotify-cta-banner.warn .cta-icon { color: #f87171; }
+    .cta-icon { font-size: 30px; flex-shrink: 0; }
     .cta-text { flex: 1; min-width: 0; }
-    .cta-text strong { display: block; font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; }
+    .cta-text strong { display: block; font-size: 14px; font-weight: 800; color: var(--text-primary); margin-bottom: 2px; }
     .cta-text span { font-size: 12px; color: var(--text-secondary); }
     .connect-btn {
       flex-shrink: 0;
-      padding: 9px 22px;
+      padding: 10px 24px;
       background: #1db954;
       color: white;
       border-radius: 100px;
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
-      border: none;
-      white-space: nowrap;
+      font-size: 13px; font-weight: 800;
+      cursor: pointer; transition: all 0.2s;
+      border: none; white-space: nowrap;
+      box-shadow: 0 4px 16px rgba(29,185,84,0.35);
     }
-    .connect-btn:hover { background: #1ed760; transform: scale(1.04); }
-    .retry-btn { background: #7c3aed; }
-    .retry-btn:hover { background: #6d28d9; }
+    .connect-btn:hover { background: #1ed760; transform: scale(1.04); box-shadow: 0 6px 20px rgba(29,185,84,0.5); }
+    .retry-btn { background: var(--accent-primary); box-shadow: 0 4px 16px rgba(176,110,243,0.35); }
+    .retry-btn:hover { background: #9f5ef0; box-shadow: 0 6px 20px rgba(176,110,243,0.5); }
 
     /* Two-Column Panel */
     .dual-panel {
@@ -621,51 +624,96 @@ interface TrendingRegion {
     }
 
     .panel {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg);
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: var(--radius-xl);
       animation: fadeIn 0.5s ease forwards;
       overflow: hidden;
       min-width: 0;
+      position: relative;
+      backdrop-filter: blur(20px);
+    }
+    /* Gradient top accent line on panels */
+    .panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 10%; right: 10%;
+      height: 1px;
+      background: var(--accent-gradient-warm);
+      opacity: 0.3;
+      border-radius: 0 0 2px 2px;
     }
 
     .panel-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 18px 8px;
+      padding: 18px 20px 10px;
     }
-    .panel-header h2 { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .panel-header h2 {
+      font-size: 16px; font-weight: 800;
+      display: flex; align-items: center; gap: 8px;
+      letter-spacing: -0.3px;
+    }
 
     .show-more-btn {
-      font-size: 11px; font-weight: 600; color: var(--accent-primary);
-      padding: 4px 12px; border-radius: 100px;
-      border: 1px solid rgba(167,139,250,0.2);
-      background: rgba(167,139,250,0.06); transition: all var(--transition-fast); cursor: pointer;
+      font-size: 11px; font-weight: 700; color: var(--accent-primary);
+      padding: 5px 14px; border-radius: 100px;
+      border: 1px solid rgba(176,110,243,0.25);
+      background: rgba(176,110,243,0.08); transition: all var(--transition-base); cursor: pointer;
     }
-    .show-more-btn:hover { background: rgba(167,139,250,0.15); border-color: rgba(167,139,250,0.4); }
+    .show-more-btn:hover {
+      background: rgba(176,110,243,0.18);
+      border-color: rgba(176,110,243,0.45);
+      box-shadow: 0 0 12px rgba(176,110,243,0.15);
+    }
 
     .region-selector { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; width: 100%; -webkit-overflow-scrolling: touch; }
     .region-selector::-webkit-scrollbar { display: none; }
     .region-btn {
-      font-size: 11px; font-weight: 600; color: var(--text-secondary);
-      padding: 4px 10px; border-radius: 100px; border: 1px solid var(--border-subtle);
-      background: transparent; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+      font-size: 12px; font-weight: 600; color: var(--text-secondary);
+      padding: 5px 12px; border-radius: 100px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: rgba(255,255,255,0.03);
+      cursor: pointer; transition: all var(--transition-base); white-space: nowrap;
     }
-    .region-btn:hover { color: var(--text-primary); border-color: rgba(255,0,0,0.3); }
-    .region-btn.active { background: rgba(255,0,0,0.1); color: #ff4444; border-color: rgba(255,68,68,0.4); }
+    .region-btn:hover { color: var(--text-primary); border-color: rgba(255,51,51,0.3); background: rgba(255,51,51,0.06); }
+    .region-btn.active {
+      background: rgba(255,51,51,0.12); color: #ff5555;
+      border-color: rgba(255,51,51,0.4);
+      box-shadow: 0 0 10px rgba(255,51,51,0.1);
+    }
     .region-flag { margin-right: 2px; }
 
-    .panel-tracks { padding: 4px 6px 10px; overflow: hidden; }
+    .panel-tracks { padding: 4px 8px 12px; overflow: hidden; }
 
     .empty-state { padding: 40px; text-align: center; color: var(--text-tertiary); font-size: 14px; }
 
+    /* Shimmer loading skeleton */
     .loading {
-      display: flex; align-items: center; justify-content: center;
-      gap: 12px; padding: 40px; color: var(--text-tertiary);
+      display: flex; flex-direction: column;
+      gap: 10px; padding: 24px 12px;
     }
+    .skel-row {
+      display: flex; align-items: center; gap: 14px;
+      padding: 8px 6px;
+    }
+    .skel-thumb {
+      width: 50px; height: 50px; border-radius: 8px; flex-shrink: 0;
+      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s ease-in-out infinite;
+    }
+    .skel-text { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .skel-line {
+      height: 12px; border-radius: 6px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s ease-in-out infinite;
+    }
+    .skel-line.short { width: 55%; }
     .spinner {
-      width: 24px; height: 24px; border: 2px solid var(--border-medium);
+      width: 24px; height: 24px; border: 2px solid rgba(176,110,243,0.2);
       border-top-color: var(--accent-primary); border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
