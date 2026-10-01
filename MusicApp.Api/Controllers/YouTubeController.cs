@@ -8,10 +8,12 @@ namespace MusicApp.Api.Controllers;
 public class YouTubeController : ControllerBase
 {
     private readonly YouTubeService _youtubeService;
+    private readonly SpotifyService _spotifyService;
 
-    public YouTubeController(YouTubeService youtubeService)
+    public YouTubeController(YouTubeService youtubeService, SpotifyService spotifyService)
     {
         _youtubeService = youtubeService;
+        _spotifyService = spotifyService;
     }
 
     [HttpGet("trending")]
@@ -24,14 +26,28 @@ public class YouTubeController : ControllerBase
     /// <summary>
     /// Universal AI trending — context can be any music context string:
     /// "Global pop", "Latin", "K-Pop", "Malayalam music", "songs similar to X by Y", etc.
+    /// When a Spotify token is provided, real short-term top tracks are fetched and used
+    /// as grounding context for the LLM, reducing hallucination and personalizing results.
     /// </summary>
     [HttpGet("ai-trending")]
-    public async Task<IActionResult> GetAITrending([FromQuery] string context, [FromQuery] string fallback = "")
+    public async Task<IActionResult> GetAITrending(
+        [FromQuery] string context,
+        [FromQuery] string fallback = "",
+        [FromHeader(Name = "X-Spotify-Token")] string? spotifyToken = null)
     {
         if (string.IsNullOrWhiteSpace(context))
             return BadRequest("Query parameter 'context' is required");
 
-        var results = await _youtubeService.GetAITrendingAsync(context, fallback);
+        // Fetch real-time Spotify chart data to ground the LLM in the user's listening habits
+        IEnumerable<string>? chartHints = null;
+        if (!string.IsNullOrEmpty(spotifyToken))
+        {
+            var topTracks = await _spotifyService.GetTopTracksAsync(spotifyToken, "short_term");
+            if (topTracks.Count > 0)
+                chartHints = topTracks.Take(5).Select(t => $"{t.Title} by {t.Artist}");
+        }
+
+        var results = await _youtubeService.GetAITrendingAsync(context, fallback, chartHints);
         return Ok(results);
     }
 
@@ -53,7 +69,7 @@ public class YouTubeController : ControllerBase
     /// months = how far back to look (default 18, so always slides with today's date).
     /// </summary>
     [HttpGet("trending-language")]
-    public async Task<IActionResult> GetTrendingLanguage([FromQuery] string q, [FromQuery] int months = 18)
+    public async Task<IActionResult> GetTrendingLanguage([FromQuery] string q, [FromQuery] int months = 3)
     {
         if (string.IsNullOrWhiteSpace(q))
             return BadRequest("Query parameter 'q' is required");

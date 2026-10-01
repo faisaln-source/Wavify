@@ -21,9 +21,14 @@ public class YouTubeService
     /// <summary>
     /// Universal AI-powered trending: asks Groq to list top 10 songs for any context
     /// (language, region, similarity), then fetches each from YouTube.
-    /// Falls back to viewCount search using fallbackQuery if AI is unavailable.
+    /// Optional <paramref name="chartHints"/> (real Spotify chart titles) ground the LLM
+    /// in actual user listening data, reducing hallucination.
+    /// Falls back to a velocity-ranked dual-query strategy if AI is unavailable.
     /// </summary>
-    public async Task<List<UnifiedTrack>> GetAITrendingAsync(string context, string fallbackQuery = "")
+    public async Task<List<UnifiedTrack>> GetAITrendingAsync(
+        string context,
+        string fallbackQuery = "",
+        IEnumerable<string>? chartHints = null)
     {
         var groqKey = _config["Groq:ApiKey"];
         var ytKey = _config["YouTube:ApiKey"];
@@ -37,9 +42,14 @@ public class YouTubeService
                 groqClient.DefaultRequestHeaders.Authorization =
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", groqKey);
 
+                // Ground the LLM with real chart data when available — reduces hallucination
+                var chartContext = chartHints?.Any() == true
+                    ? $"These songs are currently trending for this user: {string.Join(", ", chartHints.Take(5))}.\nUse these as genre/style reference and suggest similar trending songs.\n"
+                    : "";
+
                 var prompt = $"""
-                    You are a music expert with up-to-date knowledge of charts and viral songs.
-                    List the top 10 most trending and popular {context} songs RIGHT NOW in 2025-2026.
+                    You are a music chart expert with knowledge of viral songs and streaming charts.
+                    {chartContext}List the top 10 most trending and popular {context} songs RIGHT NOW in 2025-2026.
                     Return ONLY a valid JSON array of strings, nothing else — no markdown, no explanation:
                     ["Song Name - Artist Name", "Song Name - Artist Name", ...]
                     Rules:
@@ -47,11 +57,13 @@ public class YouTubeService
                     - Include songs with millions of streams/views right now.
                     - DO NOT include old songs unless they are currently trending again.
                     - Each entry must be "Song Title - Artist Name" format.
+                    - Prioritize songs matching the genre/style of the reference songs if provided.
                     """;
 
                 var payload = new
                 {
-                    model = "llama-3.1-8b-instant",
+                    // Upgraded: llama-3.3-70b has far better chart/music knowledge than 8b-instant
+                    model = "llama-3.3-70b-versatile",
                     messages = new[] { new { role = "user", content = prompt } },
                     temperature = 0.2,
                     max_tokens = 600
@@ -75,58 +87,90 @@ public class YouTubeService
         {
             var fetchTasks = songQueries.Take(10).Select(q => FetchFirstYouTubeResult(q, ytKey));
             var results = await Task.WhenAll(fetchTasks);
-            var tracks = results.Where(t => t != null).ToList()!;
-            if (tracks.Count > 0) return tracks!;
+            var tracks = results.Where(t => t != null).Cast<UnifiedTrack>().ToList();
+            if (tracks.Count > 0)
+            {
+                // Deduplicate by normalized title and sort freshest-first
+                return tracks
+                    .DistinctBy(t => NormalizeTitle(t.Title))
+                    .OrderByDescending(ComputeVelocityScore)
+                    .ToList();
+            }
         }
 
-        // Fallback: viewCount search with provided fallback query
+        // Enhanced fallback: dual-query (recent + popular), velocity-ranked and deduplicated
         var fq = string.IsNullOrWhiteSpace(fallbackQuery) ? context : fallbackQuery;
-        return await SearchTrendingLanguageAsync(fq, 18);
+        return await GetVelocityRankedFallbackAsync(fq);
     }
 
     // Keep old method for backward compatibility — delegates to generalized version
     public Task<List<UnifiedTrack>> GetAITrendingLanguageAsync(string language) =>
         GetAITrendingAsync($"{language} music", $"{language} song");
 
+    private static readonly string[] VideoJunkKeywords =
+    [
+        "#shorts", "#short", "mashup", "reaction", "cover", "remix",
+        "in 25 seconds", "in 6 languages", "in 5 languages", "in 10 languages",
+        "shorts", "nonstop", "jukebox", "playlist", "compilation",
+        "back to back", "best of", "top songs"
+    ];
+
+    private static bool IsVideoJunk(string title, int durationMs)
+    {
+        if (durationMs > 0 && durationMs < 90_000) return true;  // YouTube Short (< 90 sec)
+        if (durationMs > 900_000) return true;                    // Too long (> 15 min)
+        var t = title.ToLowerInvariant();
+        return VideoJunkKeywords.Any(kw => t.Contains(kw));
+    }
+
     private async Task<UnifiedTrack?> FetchFirstYouTubeResult(string query, string apiKey)
     {
         try
         {
-            var url = $"search?part=snippet&q={Uri.EscapeDataString(query)}&type=video&videoCategoryId=10&maxResults=1&key={apiKey}";
+            // Fetch 3 candidates — pick first that passes quality checks
+            var url = $"search?part=snippet&q={Uri.EscapeDataString(query)}&type=video&videoCategoryId=10&maxResults=3&key={apiKey}";
             var response = await _httpClient.GetAsync(url);
             if (!response.IsSuccessStatusCode) return null;
 
             var json = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
             var items = doc.RootElement.GetProperty("items");
-            if (!items.EnumerateArray().Any()) return null;
 
-            var item = items[0];
-            var snippet = item.GetProperty("snippet");
-            var videoId = item.GetProperty("id").GetProperty("videoId").GetString() ?? "";
-            var thumbnails = snippet.GetProperty("thumbnails");
-            var thumbnail = thumbnails.TryGetProperty("high", out var h)
-                ? h.GetProperty("url").GetString() ?? ""
-                : thumbnails.GetProperty("default").GetProperty("url").GetString() ?? "";
+            var candidates = new List<UnifiedTrack>();
+            var videoIds = new List<string>();
 
-            var publishedAt = snippet.TryGetProperty("publishedAt", out var pub) ? pub.GetString() ?? "" : "";
-
-            // Enrich with duration
-            var track = new UnifiedTrack
+            foreach (var item in items.EnumerateArray())
             {
-                Id = videoId,
-                Title = snippet.GetProperty("title").GetString() ?? query,
-                Artist = snippet.GetProperty("channelTitle").GetString() ?? "",
-                Album = publishedAt,
-                ThumbnailUrl = thumbnail,
-                DurationMs = 0,
-                Source = "youtube",
-                SourceUri = videoId,
-                PreviewUrl = ""
-            };
+                var snippet = item.GetProperty("snippet");
+                var videoId = item.GetProperty("id").GetProperty("videoId").GetString() ?? "";
+                var thumbnails = snippet.GetProperty("thumbnails");
+                var thumbnail = thumbnails.TryGetProperty("high", out var h)
+                    ? h.GetProperty("url").GetString() ?? ""
+                    : thumbnails.GetProperty("default").GetProperty("url").GetString() ?? "";
+                var publishedAt = snippet.TryGetProperty("publishedAt", out var pub) ? pub.GetString() ?? "" : "";
 
-            await EnrichWithDurations(new List<UnifiedTrack> { track }, new List<string> { videoId }, apiKey);
-            return track;
+                videoIds.Add(videoId);
+                candidates.Add(new UnifiedTrack
+                {
+                    Id = videoId,
+                    Title = snippet.GetProperty("title").GetString() ?? query,
+                    Artist = snippet.GetProperty("channelTitle").GetString() ?? "",
+                    Album = publishedAt,
+                    ThumbnailUrl = thumbnail,
+                    DurationMs = 0,
+                    Source = "youtube",
+                    SourceUri = videoId,
+                    PreviewUrl = ""
+                });
+            }
+
+            if (candidates.Count == 0) return null;
+
+            // Enrich all candidates with duration in one API call
+            await EnrichWithDurations(candidates, videoIds, apiKey);
+
+            // Return the first candidate that passes quality checks
+            return candidates.FirstOrDefault(t => !IsVideoJunk(t.Title, t.DurationMs));
         }
         catch { return null; }
     }
@@ -184,7 +228,7 @@ public class YouTubeService
     /// Search for trending language-specific music ordered by view count.
     /// publishedAfter is dynamic: 'months' months ago from now (default 18).
     /// </summary>
-    public async Task<List<UnifiedTrack>> SearchTrendingLanguageAsync(string query, int months = 18)
+    public async Task<List<UnifiedTrack>> SearchTrendingLanguageAsync(string query, int months = 3)
     {
         var apiKey = _config["YouTube:ApiKey"];
         if (string.IsNullOrEmpty(apiKey))
@@ -242,7 +286,8 @@ public class YouTubeService
         }
 
         await EnrichWithDurations(tracks, videoIds, apiKey);
-        return tracks;
+        // Remove Shorts, long compilations and junk titles
+        return tracks.Where(t => !IsVideoJunk(t.Title, t.DurationMs)).ToList();
     }
 
     public async Task<List<UnifiedTrack>> GetTrendingMusicAsync(string regionCode = "US")
@@ -284,7 +329,8 @@ public class YouTubeService
                 Id = item.GetProperty("id").GetString() ?? "",
                 Title = snippet.GetProperty("title").GetString() ?? "",
                 Artist = snippet.GetProperty("channelTitle").GetString() ?? "",
-                Album = "",
+                // Store publishedAt so ComputeVelocityScore can rank by recency
+                Album = snippet.TryGetProperty("publishedAt", out var pub) ? pub.GetString() ?? "" : "",
                 ThumbnailUrl = thumbnail,
                 DurationMs = durationMs,
                 Source = "youtube",
@@ -293,7 +339,11 @@ public class YouTubeService
             });
         }
 
-        return tracks;
+        // Apply junk filter and sort by velocity score (most recently trending first)
+        return tracks
+            .Where(t => !IsVideoJunk(t.Title, t.DurationMs))
+            .OrderByDescending(ComputeVelocityScore)
+            .ToList();
     }
 
     public async Task<List<PlaylistInfo>> SearchPlaylistsAsync(string query)
@@ -456,6 +506,47 @@ public class YouTubeService
 
         return ((hours * 3600) + (minutes * 60) + seconds) * 1000;
     }
+
+    /// <summary>
+    /// Dual-query fallback: runs recent (1-month) and popular (6-month) searches in parallel,
+    /// then merges, deduplicates by normalized title, and sorts by velocity score.
+    /// This avoids the 18-month window trap where old hits dominate "trending" results.
+    /// </summary>
+    private async Task<List<UnifiedTrack>> GetVelocityRankedFallbackAsync(string query)
+    {
+        // Run both strategies in parallel
+        var byRecentTask = SearchTrendingLanguageAsync(query, months: 1);   // freshest new drops
+        var byPopularTask = SearchTrendingLanguageAsync(query, months: 6);  // highest view-count window
+
+        var results = await Task.WhenAll(byRecentTask, byPopularTask);
+
+        return results
+            .SelectMany(x => x)
+            .DistinctBy(t => NormalizeTitle(t.Title))
+            .OrderByDescending(ComputeVelocityScore)
+            .Take(20)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Computes a velocity/trending score based on publish recency.
+    /// Score decays exponentially with a 30-day half-life.
+    /// Returns a neutral 0.5 when no publish date is available.
+    /// </summary>
+    private static double ComputeVelocityScore(UnifiedTrack track)
+    {
+        if (!DateTime.TryParse(track.Album, out var published))
+            return 0.5;
+        var daysSince = (DateTime.UtcNow - published).TotalDays;
+        // Exponential decay: score = 1 / (1 + days/30)
+        return 1.0 / (1.0 + daysSince / 30.0);
+    }
+
+    /// <summary>
+    /// Strips punctuation/spaces and lowercases a title for fuzzy deduplication.
+    /// </summary>
+    private static string NormalizeTitle(string title) =>
+        Regex.Replace(title.ToLowerInvariant(), @"[^a-z0-9]", "");
 
     private List<UnifiedTrack> GetDemoResults(string query)
     {
